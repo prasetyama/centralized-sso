@@ -19,6 +19,9 @@ class Module(BaseModel):
     class Meta:
         db_table = 'module'
 
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
 class User(BaseModel):
     google_uid = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     email = models.EmailField(unique=True, db_index=True)
@@ -29,6 +32,9 @@ class User(BaseModel):
     class Meta:
         db_table = 'user'
 
+    def __str__(self):
+        return f"{self.email}"
+
 class Role(BaseModel):
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='roles')
     name = models.CharField(max_length=100) # e.g., 'viewer_dashboard'
@@ -37,6 +43,9 @@ class Role(BaseModel):
     class Meta:
         db_table = 'role'
         unique_together = ('module', 'key')
+
+    def __str__(self):
+        return f"{self.name} ({self.key})"
 
 class Menu(BaseModel):
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='menus')
@@ -47,12 +56,18 @@ class Menu(BaseModel):
         db_table = 'menu'
         unique_together = ('module', 'code')
 
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
 class Permission(BaseModel):
     code = models.CharField(max_length=50, unique=True, db_index=True) # e.g., 'VIEW', 'SUBMIT'
     name = models.CharField(max_length=100)
 
     class Meta:
         db_table = 'permission'
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
 
 class RoleMenuPermission(BaseModel):
     role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='menu_permissions')
@@ -62,6 +77,9 @@ class RoleMenuPermission(BaseModel):
     class Meta:
         db_table = 'role_menu_permission'
         unique_together = ('role', 'menu', 'permission')
+
+    def __str__(self):
+        return f"{self.role} - {self.menu} - {self.permission}"
 
 class UserModuleRole(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='module_roles')
