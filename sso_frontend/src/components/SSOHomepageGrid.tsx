@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { LayoutGrid, ExternalLink, LogOut } from 'lucide-react';
+import { fetchUserModules } from '../api/api';
 
 export const SSOHomepageGrid = () => {
   const { user, token, modules, setModules, logout } = useAuth();
@@ -11,12 +11,8 @@ export const SSOHomepageGrid = () => {
   useEffect(() => {
     const fetchModules = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/v1/user/modules/', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        setModules(response.data.modules);
+        const response = await fetchUserModules(token!);
+        setModules(response.data.modules || []);
       } catch (err) {
         setError('Failed to load authorized modules.');
       } finally {

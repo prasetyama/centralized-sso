@@ -42,10 +42,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('sso_user', JSON.stringify(userData));
   };
 
-  const setModules = (newModules: Module[]) => {
-    setModulesState(newModules);
-  };
-
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -61,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         token,
         modules,
         login,
-        setModules,
+        setModules: setModulesState,
         logout,
         isAuthenticated: !!token,
       }}

@@ -6,8 +6,8 @@ class RoleRepository:
     def get_user_authorized_modules(user_id: str) -> List[Dict[str, Any]]:
         # Get modules the user has access to based on UserModuleRole mapping
         modules = Module.objects.filter(
-            user_module_role__user_id=user_id,
-            user_module_role__is_active=True,
+            usermodulerole__user_id=user_id,
+            usermodulerole__is_active=True,
             is_active=True
         ).distinct()
         
