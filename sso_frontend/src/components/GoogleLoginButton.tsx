@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { googleLogin } from '../api/api';
 
 export const GoogleLoginButton = () => {
   const { login } = useAuth();
@@ -10,29 +10,17 @@ export const GoogleLoginButton = () => {
   const location = useLocation();
   const [error, setError] = useState('');
 
-  // Extract redirect_url from query parameters
   const queryParams = new URLSearchParams(location.search);
   const redirectUrl = queryParams.get('redirect_url');
 
   const handleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
-        // Exchange access_token/id_token with our backend
-        // Note: useGoogleLogin by default returns an access_token.
-        // If we want an id_token, we should configure it or use GoogleCredentialResponse from GoogleLogin component.
-        // For this example, we assume backend can verify the access_token or we get the id_token.
-
-        // Since we are using standard useGoogleLogin, let's assume backend accepts it in the payload.
-        const response = await axios.post('http://localhost:8000/api/v1/auth/google/', {
-          token: tokenResponse.access_token // Or id_token if using standard GoogleLogin component
-        });
-
+        const response = await googleLogin(tokenResponse.access_token);
         const { access_token, user } = response.data;
-        console.log('response', response)
         login(user, access_token);
 
         if (redirectUrl) {
-          // Redirect back to client app with the token
           window.location.href = `${redirectUrl}?token=${access_token}`;
         } else {
           navigate('/dashboard');

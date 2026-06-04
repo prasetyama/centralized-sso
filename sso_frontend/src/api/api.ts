@@ -17,3 +17,15 @@ export const fetchUserModules = async (token: string) => {
         throw error;
     }
 }
+
+export const googleLogin = async (token: string) => {
+    try {
+        const response = await api.post('/auth/google/', {
+            token: token
+        });
+        return response;
+    } catch (error) {
+        console.error('Error logging in with Google:', error);
+        throw error;
+    }
+}

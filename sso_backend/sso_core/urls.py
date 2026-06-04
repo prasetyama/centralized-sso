@@ -1,5 +1,5 @@
 from django.urls import path
-from sso_core.views.auth_views import GoogleLoginView, UserModulesView, VerifyPermissionView
+from sso_core.views import GoogleLoginView, UserModulesView, VerifyPermissionView
 
 urlpatterns = [
     path('auth/google/', GoogleLoginView.as_view(), name='google-login'),
