@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 
-from sso_core.models import User, Module, RoleMenuPermission
+from sso_core.models import User, Module
 from sso_core.serializers import UserSerializer, ModuleSerializer, GoogleLoginSerializer
 
 
@@ -118,39 +118,58 @@ class UserModulesView(BaseAuthenticatedView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
-
-class VerifyPermissionView(BaseAuthenticatedView):
-    """
-    Verifies if a user has a specific permission action on a menu.
-    """
+class MenuAccessMatrixView(BaseAuthenticatedView):
     def get(self, request):
+        """
+        Returns a matrix showing which roles have access to which menus within each module.
+        
+        Example Output:
+        {
+            "ERP": {
+                "ORDER": {
+                    "DASHBOARD": ["admin", "supervisor", "sales", "finance"],
+                    "CREATE": ["admin", "supervisor", "sales"],
+                    "APPROVAL": ["admin", "finance"],
+                    "ADMIN": ["admin"]
+                },
+                "REPORT": {
+                    "SALES": ["admin", "sales", "finance"],
+                    "INVENTORY": ["admin"]
+                }
+            }
+        }
+        """
         try:
             payload = self.get_user_from_token(request)
-            user_id = payload.get('user_id')
             
-            module_code = request.query_params.get('module')
-            menu_code = request.query_params.get('menu')
-            permission_code = request.query_params.get('action')
+            # Get all modules
+            modules = Module.objects.filter(is_active=True)
             
-            if not all([module_code, menu_code, permission_code]):
-                return Response({
-                    "error": "Missing required query parameters: module, menu, action"
-                }, status=status.HTTP_400_BAD_REQUEST)
+            access_matrix = {}
             
-            # Check permission in DB
-            has_perm = RoleMenuPermission.objects.filter(
-                role__module_roles__user_id=user_id,
-                role__module_roles__is_active=True,
-                role__is_active=True,
-                role__module__code=module_code,
-                menu__code=menu_code,
-                menu__is_active=True,
-                permission__code=permission_code,
-                permission__is_active=True,
-                is_active=True
-            ).exists()
+            for module in modules:
+                module_code = module.code
+                access_matrix[module_code] = {}
+                
+                # Get all menus for this module
+                menus = module.menus.filter(is_active=True)
+                
+                for menu in menus:
+                    menu_code = menu.code
+                    access_matrix[module_code][menu_code] = []
+                    
+                    # Get all roles that have access to this menu
+                    roles = menu.roles.filter(is_active=True)
+                    
+                    for role in roles:
+                        access_matrix[module_code][menu_code].append(role.key)
             
-            return Response({"has_permission": has_perm}, status=status.HTTP_200_OK)
+            return Response(access_matrix, status=status.HTTP_200_OK)
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+

@@ -29,3 +29,17 @@ export const googleLogin = async (token: string) => {
         throw error;
     }
 }
+
+export const fetchUserMenuAccess = async (token: string) => {
+    try {
+        const response = await api.get('/user/menu-access/', {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+        return response;
+    } catch (error) {
+        console.error('Error fetching menu access:', error);
+        throw error;
+    }
+}

@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { fetchUserModules, fetchUserMenuAccess } from '../api/api';
 
 export interface User {
   id: string;
@@ -19,6 +20,9 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   modules: Module[];
+  menuAccess: any[];
+  loadingData: boolean;
+  errorData: string;
   login: (userData: User, authToken: string) => void;
   setModules: (modules: Module[]) => void;
   logout: () => void;
@@ -34,6 +38,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('sso_token'));
   const [modules, setModulesState] = useState<Module[]>([]);
+  const [menuAccess, setMenuAccess] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState<boolean>(true);
+  const [errorData, setErrorData] = useState<string>('');
+
+  const logout = () => {
+    setUser(null);
+    setToken(null);
+    setModulesState([]);
+    setMenuAccess([]);
+    localStorage.removeItem('sso_token');
+    localStorage.removeItem('sso_user');
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!token) {
+        setLoadingData(false);
+        return;
+      }
+      
+      setLoadingData(true);
+      setErrorData('');
+      
+      try {
+        const modulesResponse = await fetchUserModules(token);
+        setModulesState(modulesResponse.data.modules || []);
+        
+        const menuAccessResponse = await fetchUserMenuAccess(token);
+        setMenuAccess(menuAccessResponse.data.menu_access || []);
+      } catch (err: any) {
+        const errorMsg = err.response?.data?.detail || err.response?.data?.message || err.message;
+        if (errorMsg === 'Token has expired' || err.response?.status === 401) {
+          logout();
+          window.location.href = '/login';
+        } else {
+          setErrorData('Failed to load data.');
+        }
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    
+    fetchData();
+  }, [token]);
 
   const login = (userData: User, authToken: string) => {
     setUser(userData);
@@ -42,20 +90,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('sso_user', JSON.stringify(userData));
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    setModulesState([]);
-    localStorage.removeItem('sso_token');
-    localStorage.removeItem('sso_user');
-  };
-
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
         modules,
+        menuAccess,
+        loadingData,
+        errorData,
         login,
         setModules: setModulesState,
         logout,

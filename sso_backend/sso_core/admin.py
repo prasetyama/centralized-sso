@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Module, Role, Menu, Permission, RoleMenuPermission, UserModuleRole
+from .models import User, Module, Role, Menu, UserModuleRole
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -17,10 +17,10 @@ class ModuleAdmin(admin.ModelAdmin):
 
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
-    list_display = ('key', 'name', 'module__name', 'is_active')
-    list_filter = ('module__name', 'is_active')
-    search_fields = ('key', 'name', 'module__name')
-    ordering = ('module__name', 'key')
+    list_display = ('key', 'name', 'menu__name', 'is_active')
+    list_filter = ('menu__name', 'is_active')
+    search_fields = ('key', 'name', 'menu__name')
+    ordering = ('menu__name', 'key')
 
 @admin.register(Menu)
 class MenuAdmin(admin.ModelAdmin):
@@ -29,18 +29,6 @@ class MenuAdmin(admin.ModelAdmin):
     search_fields = ('code', 'name', 'module__name')
     ordering = ('module__name', 'code')
 
-
-@admin.register(Permission)
-class PermissionAdmin(admin.ModelAdmin):
-    list_display = ('code', 'name')
-    search_fields = ('code', 'name')
-    ordering = ('code',)
-
-@admin.register(RoleMenuPermission)
-class RoleMenuPermissionAdmin(admin.ModelAdmin):
-    list_display = ('role__key', 'menu__code', 'permission__code')
-    list_filter = ('role__key', 'menu__code', 'permission__code')
-    search_fields = ('role__key', 'menu__code', 'permission__code')
 
 @admin.register(UserModuleRole)
 class UserModuleRoleAdmin(admin.ModelAdmin):

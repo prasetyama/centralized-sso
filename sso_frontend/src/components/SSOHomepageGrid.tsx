@@ -1,36 +1,15 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LayoutGrid, ExternalLink, LogOut } from 'lucide-react';
-import { fetchUserModules } from '../api/api';
 
 export const SSOHomepageGrid = () => {
-  const { user, token, modules, setModules, logout } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const fetchModules = async () => {
-      try {
-        const response = await fetchUserModules(token!);
-        setModules(response.data.modules || []);
-      } catch (err) {
-        setError('Failed to load authorized modules.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (token) {
-      fetchModules();
-    }
-  }, [token, setModules]);
+  const { user, token, modules, logout, loadingData, errorData } = useAuth();
 
   const handleAppClick = (url: string) => {
     // Navigate to the client app, passing the token if needed
     window.location.href = `${url}?token=${token}`;
   };
 
-  if (loading) return <div className="flex justify-center items-center h-screen">Loading apps...</div>;
+  if (loadingData) return <div className="flex justify-center items-center h-screen">Loading apps...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -63,7 +42,7 @@ export const SSOHomepageGrid = () => {
 
       {/* Main Content */}
       <main className="flex-1 p-8 max-w-7xl mx-auto w-full">
-        {error && <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-6">{error}</div>}
+        {errorData && <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-6">{errorData}</div>}
 
         {modules.length === 0 ? (
           <div className="text-center py-20">

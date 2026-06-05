@@ -35,18 +35,6 @@ class User(BaseModel):
     def __str__(self):
         return f"{self.email}"
 
-class Role(BaseModel):
-    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='roles')
-    name = models.CharField(max_length=100) # e.g., 'viewer_dashboard'
-    key = models.CharField(max_length=150, unique=True, db_index=True) # e.g., 'eorder.viewer_dashboard'
-
-    class Meta:
-        db_table = 'role'
-        unique_together = ('module', 'key')
-
-    def __str__(self):
-        return f"{self.name} ({self.key})"
-
 class Menu(BaseModel):
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='menus')
     code = models.CharField(max_length=50, db_index=True) # e.g., 'ORDER_LIST'
@@ -59,27 +47,19 @@ class Menu(BaseModel):
     def __str__(self):
         return f"{self.name} ({self.code})"
 
-class Permission(BaseModel):
-    code = models.CharField(max_length=50, unique=True, db_index=True) # e.g., 'VIEW', 'SUBMIT'
-    name = models.CharField(max_length=100)
+class Role(BaseModel):
+    menu = models.ForeignKey(Menu, on_delete=models.CASCADE, related_name='roles')
+    name = models.CharField(max_length=100) # e.g., 'viewer_dashboard'
+    key = models.CharField(max_length=150, unique=True, db_index=True) # e.g., 'eorder.viewer_dashboard'
 
     class Meta:
-        db_table = 'permission'
+        db_table = 'role'
+        unique_together = ('menu', 'key')
 
     def __str__(self):
-        return f"{self.name} ({self.code})"
+        return f"{self.name} ({self.key})"
 
-class RoleMenuPermission(BaseModel):
-    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='menu_permissions')
-    menu = models.ForeignKey(Menu, on_delete=models.CASCADE)
-    permission = models.ForeignKey(Permission, on_delete=models.CASCADE)
 
-    class Meta:
-        db_table = 'role_menu_permission'
-        unique_together = ('role', 'menu', 'permission')
-
-    def __str__(self):
-        return f"{self.role} - {self.menu} - {self.permission}"
 
 class UserModuleRole(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='module_roles')
