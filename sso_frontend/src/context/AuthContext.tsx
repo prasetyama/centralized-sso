@@ -40,12 +40,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [errorData, setErrorData] = useState<string>('');
 
+  const queryParams = new URLSearchParams(location.search);
+  const redirectUrl = queryParams.get('redirect_url');
+
   const logout = () => {
     setUser(null);
     setToken(null);
     setModulesState([]);
     localStorage.removeItem('sso_token');
     localStorage.removeItem('sso_user');
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    } else {
+      window.location.href = '/login';
+    }
   };
 
   useEffect(() => {

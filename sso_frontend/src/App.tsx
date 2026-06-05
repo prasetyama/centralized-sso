@@ -13,6 +13,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const Logout = () => {
+  const { isAuthenticated, logout } = useAuth();
+  if (isAuthenticated) {
+    logout();
+  }
+  return null;
+};
+
 const LoginPage = () => {
   const { isAuthenticated } = useAuth();
   if (isAuthenticated) {
@@ -122,6 +130,7 @@ function App() {
               }
             />
             <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/logout" element={<Logout />} />
           </Routes>
         </Router>
       </AuthProvider>

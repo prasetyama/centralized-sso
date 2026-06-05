@@ -32,7 +32,7 @@ export const SSOHomepageGrid = () => {
           </div>
           <button
             onClick={logout}
-            className="text-gray-500 hover:text-red-500 transition-colors p-2"
+            className="text-gray-500 hover:text-red-500 transition-colors p-2 cursor-pointer"
             title="Log out"
           >
             <LogOut size={20} />
