@@ -76,10 +76,30 @@ class GoogleLoginView(APIView):
             jwt_algorithm = os.getenv('JWT_ALGORITHM')
             access_token_lifetime = int(os.getenv('ACCESS_TOKEN_LIFETIME', '60'))
             
+            # Fetch user's menu access to embed in token
+            menu_access = {}
+            user_module_roles = user.module_roles.filter(
+                is_active=True, 
+                role__is_active=True, 
+                module__is_active=True
+            ).select_related('module', 'role', 'role__menu')
+            
+            for umr in user_module_roles:
+                module_code = umr.module.code
+                if module_code not in menu_access:
+                    menu_access[module_code] = {}
+                    
+                menu_code = umr.role.menu.code
+                if menu_code not in menu_access[module_code]:
+                    menu_access[module_code][menu_code] = []
+                    
+                menu_access[module_code][menu_code].append(umr.role.key)
+            
             payload = {
                 "user_id": str(user.id),
                 "email": user.email,
                 "first_name": user.first_name,
+                "menu_access": menu_access,
                 "exp": datetime.utcnow() + timedelta(minutes=access_token_lifetime),
                 "iat": datetime.utcnow()
             }

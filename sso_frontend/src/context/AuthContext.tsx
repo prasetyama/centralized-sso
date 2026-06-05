@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { fetchUserModules, fetchUserMenuAccess } from '../api/api';
+import { fetchUserModules } from '../api/api';
 
 export interface User {
   id: string;
@@ -20,7 +20,6 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   modules: Module[];
-  menuAccess: any[];
   loadingData: boolean;
   errorData: string;
   login: (userData: User, authToken: string) => void;
@@ -38,7 +37,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('sso_token'));
   const [modules, setModulesState] = useState<Module[]>([]);
-  const [menuAccess, setMenuAccess] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [errorData, setErrorData] = useState<string>('');
 
@@ -46,7 +44,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setToken(null);
     setModulesState([]);
-    setMenuAccess([]);
     localStorage.removeItem('sso_token');
     localStorage.removeItem('sso_user');
   };
@@ -57,16 +54,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoadingData(false);
         return;
       }
-      
+
       setLoadingData(true);
       setErrorData('');
-      
+
       try {
         const modulesResponse = await fetchUserModules(token);
         setModulesState(modulesResponse.data.modules || []);
-        
-        const menuAccessResponse = await fetchUserMenuAccess(token);
-        setMenuAccess(menuAccessResponse.data.menu_access || []);
       } catch (err: any) {
         const errorMsg = err.response?.data?.detail || err.response?.data?.message || err.message;
         if (errorMsg === 'Token has expired' || err.response?.status === 401) {
@@ -79,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoadingData(false);
       }
     };
-    
+
     fetchData();
   }, [token]);
 
@@ -96,7 +90,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         token,
         modules,
-        menuAccess,
         loadingData,
         errorData,
         login,
