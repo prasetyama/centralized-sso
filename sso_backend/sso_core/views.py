@@ -8,8 +8,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 
-from sso_core.models import User, Module
-from sso_core.serializers import UserSerializer, ModuleSerializer, GoogleLoginSerializer
+from sso_core.models import User, Module, ModuleMatrix
+from sso_core.serializers import UserSerializer, ModuleMatrixSerializer, GoogleLoginSerializer
 
 
 class BaseAuthenticatedView(APIView):
@@ -61,15 +61,18 @@ class GoogleLoginView(APIView):
                 raise ValueError("Google token did not provide an email.")
             
             # Get or create User
-            user = User.objects.filter(email=email, is_active=True).first()
+            user = User.objects.filter(email=email, status=1).first()
             if not user:
-                user = User.objects.create(
-                    email=email,
-                    first_name=idinfo.get('given_name', ''),
-                    last_name=idinfo.get('family_name', ''),
-                    google_uid=idinfo.get('sub', ''),
-                    avatar_url=idinfo.get('picture', '')
-                )
+                # user = User.objects.create(
+                #     email=email,
+                #     name=idinfo.get('given_name', '') + ' ' + idinfo.get('family_name', ''),
+                #     department=idinfo.get('department', ''),
+                #     role=idinfo.get('role', ''),
+                #     image=idinfo.get('picture', ''),
+                #     status=1
+                # )
+
+                return Response({"error": "User not found"}, status=status.HTTP_401_UNAUTHORIZED)
             
             # Issue JWT
             jwt_secret = os.getenv('JWT_SECRET')
@@ -78,6 +81,13 @@ class GoogleLoginView(APIView):
             
             # Fetch user's menu access to embed in token
             menu_access = {}
+            module_access = {}
+
+            user_module_access = ModuleMatrix.objects.filter(email=email)
+            
+            if user_module_access:
+                module_access = {item.module: item.operator for item in user_module_access}
+                
             user_module_roles = user.module_roles.filter(
                 is_active=True, 
                 role__is_active=True, 
@@ -98,8 +108,12 @@ class GoogleLoginView(APIView):
             payload = {
                 "user_id": str(user.id),
                 "email": user.email,
-                "first_name": user.first_name,
+                "name": user.name,
+                "department": user.department,
+                "role": user.role,
+                "image": user.image,
                 "menu_access": menu_access,
+                "module_access": module_access,
                 "exp": datetime.utcnow() + timedelta(minutes=access_token_lifetime),
                 "iat": datetime.utcnow()
             }
@@ -126,13 +140,11 @@ class UserModulesView(BaseAuthenticatedView):
             user_id = payload.get('user_id')
             
             # Retrieve modules the user has access to based on UserModuleRole mapping
-            modules = Module.objects.filter(
-                usermodulerole__user_id=user_id,
-                usermodulerole__is_active=True,
-                is_active=True
-            ).distinct()
+            modules = ModuleMatrix.objects.filter(
+                email=payload.get('email')
+            )
             
-            serializer = ModuleSerializer(modules, many=True)
+            serializer = ModuleMatrixSerializer(modules, many=True)
             return Response({"modules": serializer.data}, status=status.HTTP_200_OK)
             
         except Exception as e:

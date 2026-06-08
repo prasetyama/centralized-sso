@@ -3,10 +3,10 @@ from .models import User, Module, Role, Menu, UserModuleRole
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('google_uid', 'email', 'first_name', 'last_name', 'is_active')
-    list_filter = ('is_active',)
-    search_fields = ('google_uid', 'email', 'first_name', 'last_name')
-    ordering = ('google_uid',)
+    list_display = ('email', 'name', 'department', 'role', 'status')
+    list_filter = ('status',)
+    search_fields = ('email', 'name', 'department', 'role', 'status')
+    ordering = ('email',)
 
 @admin.register(Module)
 class ModuleAdmin(admin.ModelAdmin):
@@ -32,6 +32,6 @@ class MenuAdmin(admin.ModelAdmin):
 
 @admin.register(UserModuleRole)
 class UserModuleRoleAdmin(admin.ModelAdmin):
-    list_display = ('user__email', 'module__name', 'role__key')
+    list_display = ('user__email', 'module__name', 'role__key', 'is_active')
     list_filter = ('user__email', 'module__name', 'role__key')
     search_fields = ('user__email', 'module__name', 'role__key')

@@ -21,14 +21,14 @@ export const SSOHomepageGrid = () => {
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt="Profile" className="w-8 h-8 rounded-full" />
+            {user?.image ? (
+              <img src={user.image} alt="Profile" className="w-8 h-8 rounded-full" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
-                {user?.first_name?.charAt(0)}
+                {user?.name?.charAt(0)}
               </div>
             )}
-            <span className="text-sm font-medium text-gray-700">{user?.first_name} {user?.last_name}</span>
+            <span className="text-sm font-medium text-gray-700">{user?.name}</span>
           </div>
           <button
             onClick={logout}
@@ -53,7 +53,7 @@ export const SSOHomepageGrid = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {modules.map((mod) => (
               <div
-                key={mod.code}
+                key={mod.module}
                 onClick={() => handleAppClick(mod.redirect_url)}
                 className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg hover:border-indigo-300 transition-all cursor-pointer group flex flex-col h-full"
               >
@@ -63,8 +63,8 @@ export const SSOHomepageGrid = () => {
                   </div>
                   <ExternalLink size={20} className="text-gray-400 group-hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-all" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-800 mb-2">{mod.name}</h3>
-                <p className="text-sm text-gray-500 flex-1">{mod.description || 'Access module application.'}</p>
+                <h3 className="text-lg font-bold text-gray-800 mb-2">{mod.module}</h3>
+                <p className="text-sm text-gray-500 flex-1">{mod.operator || 'Access module application.'}</p>
               </div>
             ))}
           </div>

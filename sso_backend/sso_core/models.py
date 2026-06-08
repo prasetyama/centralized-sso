@@ -1,6 +1,12 @@
 from django.db import models
 import uuid
 
+class ITamModule(models.Model):
+    id = models.IntegerField(primary_key=True)
+
+    class Meta:
+        abstract = True
+
 class BaseModel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -22,15 +28,17 @@ class Module(BaseModel):
     def __str__(self):
         return f"{self.name} ({self.code})"
 
-class User(BaseModel):
-    google_uid = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+class User(ITamModule):
+    # google_uid = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     email = models.EmailField(unique=True, db_index=True)
-    first_name = models.CharField(max_length=150)
-    last_name = models.CharField(max_length=150, blank=True, null=True)
-    avatar_url = models.URLField(max_length=500, blank=True, null=True)
+    name = models.CharField(max_length=150)
+    department = models.CharField(max_length=150)
+    role = models.CharField(max_length=50)
+    image = models.URLField(max_length=500, blank=True, null=True)
+    status = models.CharField(max_length=2)
 
     class Meta:
-        db_table = 'user'
+        db_table = 'User Matrix'
 
     def __str__(self):
         return f"{self.email}"
@@ -69,3 +77,13 @@ class UserModuleRole(BaseModel):
     class Meta:
         db_table = 'user_module_role'
         unique_together = ('user', 'module', 'role')
+
+
+class ModuleMatrix(ITamModule):
+    email = models.EmailField(unique=True, db_index=True)
+    module = models.CharField(max_length=50, db_index=True)
+    operator = models.CharField(max_length=50, db_index=True)
+    
+    class Meta:
+        db_table = 'module_matrix'
+        

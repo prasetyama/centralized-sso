@@ -4,15 +4,15 @@ import { fetchUserModules } from '../api/api';
 export interface User {
   id: string;
   email: string;
-  first_name: string;
-  last_name?: string;
-  avatar_url?: string;
+  name: string;
+  department: string;
+  role: string;
+  image?: string;
 }
 
 export interface Module {
-  code: string;
-  name: string;
-  description: string;
+  module: string;
+  operator: string;
   redirect_url: string;
 }
 
