@@ -1,6 +1,12 @@
 from django.db import models
 import uuid
 
+class ITamModule(models.Model):
+    id = models.IntegerField(primary_key=True)
+
+    class Meta:
+        abstract = True
+
 class BaseModel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -69,3 +75,11 @@ class UserModuleRole(BaseModel):
     class Meta:
         db_table = 'user_module_role'
         unique_together = ('user', 'module', 'role')
+
+class ModuleMatrix(ITamModule):
+    email = models.EmailField(unique=True, db_index=True)
+    module = models.CharField(max_length=50, db_index=True)
+    operator = models.CharField(max_length=50, db_index=True)
+    
+    class Meta:
+        db_table = 'module_matrix'

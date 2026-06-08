@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 
-from sso_core.models import User, Module
+from sso_core.models import User, Module, ModuleMatrix
 from sso_core.serializers import UserSerializer, ModuleSerializer, GoogleLoginSerializer
 
 
@@ -78,6 +78,13 @@ class GoogleLoginView(APIView):
             
             # Fetch user's menu access to embed in token
             menu_access = {}
+            module_access = {}
+
+            user_module_access = ModuleMatrix.objects.filter(email=email)
+            
+            if user_module_access:
+                module_access = {item.module: item.operator for item in user_module_access}
+
             user_module_roles = user.module_roles.filter(
                 is_active=True, 
                 role__is_active=True, 
@@ -100,6 +107,7 @@ class GoogleLoginView(APIView):
                 "email": user.email,
                 "first_name": user.first_name,
                 "menu_access": menu_access,
+                "module_access": module_access,
                 "exp": datetime.utcnow() + timedelta(minutes=access_token_lifetime),
                 "iat": datetime.utcnow()
             }
