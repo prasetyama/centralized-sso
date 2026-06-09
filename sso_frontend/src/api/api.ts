@@ -43,3 +43,17 @@ export const fetchUserMenuAccess = async (token: string) => {
         throw error;
     }
 }
+
+export const impersonateUser = async (token: string, email: string) => {
+    try {
+        const response = await api.post('/auth/impersonate/', { email }, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+        return response;
+    } catch (error) {
+        console.error('Error impersonating user:', error);
+        throw error;
+    }
+}

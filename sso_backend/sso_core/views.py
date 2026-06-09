@@ -203,5 +203,88 @@ class MenuAccessMatrixView(BaseAuthenticatedView):
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
+class ImpersonateView(BaseAuthenticatedView):
+    """
+    ADMIN-only endpoint: generate a JWT token impersonating another user by email.
+    The requesting user must have role='ADMIN' in their token payload.
+    """
+    def post(self, request):
+        try:
+            payload = self.get_user_from_token(request)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
+        # Only ADMIN role can impersonate
+        if str(payload.get('role', '')).upper() != 'ADMIN':
+            return Response(
+                {"error": "Permission denied. Only ADMIN users can impersonate."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
+        target_email = request.data.get('email', '').strip().lower()
+        if not target_email:
+            return Response({"error": "email is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate the target user exists and is active
+        target_user = User.objects.filter(email__iexact=target_email, status=1).first()
+        if not target_user:
+            return Response(
+                {"error": f"No active user found with email: {target_email}"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        jwt_secret = os.getenv('JWT_SECRET')
+        jwt_algorithm = os.getenv('JWT_ALGORITHM')
+        access_token_lifetime = int(os.getenv('ACCESS_TOKEN_LIFETIME', '60'))
+
+        # Build menu_access and module_access for the target user
+        menu_access = {}
+        module_access = {}
+
+        user_module_access = ModuleMatrix.objects.filter(email__iexact=target_email)
+        if user_module_access:
+            module_access = {item.module: item.operator for item in user_module_access}
+
+        user_module_roles = target_user.module_roles.filter(
+            is_active=True,
+            role__is_active=True,
+            module__is_active=True
+        ).select_related('module', 'role', 'role__menu')
+
+        for umr in user_module_roles:
+            module_code = umr.module.code
+            if module_code not in menu_access:
+                menu_access[module_code] = {}
+            menu_code = umr.role.menu.code
+            if menu_code not in menu_access[module_code]:
+                menu_access[module_code][menu_code] = []
+            menu_access[module_code][menu_code].append(umr.role.key)
+
+        impersonate_payload = {
+            "user_id": str(target_user.id),
+            "email": target_user.email,
+            "name": target_user.name,
+            "department": target_user.department,
+            "role": target_user.role,
+            "image": target_user.image,
+            "menu_access": menu_access,
+            "module_access": module_access,
+            "impersonated_by": payload.get('email'),  # audit trail
+            "exp": datetime.utcnow() + timedelta(minutes=access_token_lifetime),
+            "iat": datetime.utcnow(),
+        }
+
+        access_token = jwt.encode(impersonate_payload, jwt_secret, algorithm=jwt_algorithm)
+
+        return Response({
+            "access_token": access_token,
+            "user": {
+                "id": str(target_user.id),
+                "email": target_user.email,
+                "name": target_user.name,
+                "department": target_user.department,
+                "role": target_user.role,
+                "image": target_user.image,
+            },
+            "impersonated_by": payload.get('email'),
+        }, status=status.HTTP_200_OK)

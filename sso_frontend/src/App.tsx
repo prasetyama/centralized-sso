@@ -29,7 +29,6 @@ const LoginPage = () => {
 
   const handleEmailLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement email/password login logic
     console.log('Email login submitted');
   };
 
