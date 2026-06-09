@@ -39,6 +39,7 @@ class User(ITamModule):
 
     class Meta:
         db_table = 'User Matrix'
+        managed = False  # external table, Django won't alter it
 
     def __str__(self):
         return f"{self.email}"
@@ -86,4 +87,5 @@ class ModuleMatrix(ITamModule):
     
     class Meta:
         db_table = 'module_matrix'
-        
+        managed = False  # external table, Django won't alter it
+
