@@ -68,7 +68,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const modulesResponse = await fetchUserModules(token);
-        setModulesState(modulesResponse.data.modules || []);
+        const fetchedModules = modulesResponse.data.modules || [];
+        setModulesState(fetchedModules);
+
+        if (redirectUrl) {
+          const isAuthorized = fetchedModules.some(
+            (mod: Module) => mod.redirect_url && redirectUrl.startsWith(mod.redirect_url)
+          );
+          if (isAuthorized) {
+            const separator = redirectUrl.includes('?') ? '&' : '?';
+            window.location.href = `${redirectUrl}${separator}token=${token}`;
+            return;
+          }
+        }
       } catch (err: any) {
         const errorMsg = err.response?.data?.detail || err.response?.data?.message || err.message;
         if (errorMsg === 'Token has expired' || err.response?.status === 401) {

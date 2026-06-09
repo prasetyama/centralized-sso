@@ -209,7 +209,7 @@ const UserDropdown = ({ onImpersonate }: { onImpersonate: () => void }) => {
           <button
             id="dropdown-logout-btn"
             onClick={() => { setOpen(false); logout(); }}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
           >
             <LogOut size={15} className="text-red-400" />
             Log out
