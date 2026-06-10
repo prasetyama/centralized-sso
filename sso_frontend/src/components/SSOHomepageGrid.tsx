@@ -195,7 +195,7 @@ const UserDropdown = ({ onImpersonate }: { onImpersonate: () => void }) => {
             <button
               id="backdoor-login-btn"
               onClick={() => { setOpen(false); onImpersonate(); }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-violet-700 hover:bg-violet-50 transition-colors font-medium"
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-violet-700 hover:bg-violet-50 transition-colors font-medium cursor-pointer"
             >
               <Shield size={15} className="text-violet-500" />
               Backdoor Login

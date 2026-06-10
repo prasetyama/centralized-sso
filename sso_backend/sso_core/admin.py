@@ -17,8 +17,8 @@ class ModuleAdmin(admin.ModelAdmin):
 
 @admin.register(UserModuleRole)
 class UserModuleRoleAdmin(admin.ModelAdmin):
-    list_display = ('user_email', 'module_name', 'role', 'is_active')
-    list_filter = ('role', 'is_active', 'module_code')
+    list_display = ('user_email', 'module_name', 'role')
+    list_filter = ('role', 'module_code')
     search_fields = ('user__email', 'module_code__name', 'module_code__code')
     ordering = ('user__email', 'module_code__code')
 

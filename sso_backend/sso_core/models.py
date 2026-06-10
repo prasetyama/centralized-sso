@@ -44,7 +44,7 @@ class User(ITamModule):
     def __str__(self):
         return f"{self.email}"
 
-class UserModuleRole(BaseModel):
+class UserModuleRole(ITamModule):
     ROLE_VIEWER = 'viewer'
     ROLE_EDITOR = 'editor'
     ROLE_ADMIN = 'admin'
@@ -54,7 +54,7 @@ class UserModuleRole(BaseModel):
         (ROLE_ADMIN, 'Admin'),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='module_roles')
+    user = models.ForeignKey(User, to_field='email', db_column='email', on_delete=models.CASCADE, related_name='module_roles')
     module_code = models.ForeignKey(
         Module,
         to_field='code',

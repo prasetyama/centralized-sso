@@ -87,7 +87,6 @@ class GoogleLoginView(APIView):
 
             # Fetch module roles from UserModuleRole (viewer/editor per module)
             user_module_roles = user.module_roles.filter(
-                is_active=True,
                 module_code__is_active=True
             ).select_related('module_code')
 
