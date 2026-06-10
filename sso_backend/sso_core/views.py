@@ -88,10 +88,10 @@ class GoogleLoginView(APIView):
             # Fetch module roles from UserModuleRole (viewer/editor per module)
             user_module_roles = user.module_roles.filter(
                 is_active=True,
-                module__is_active=True
-            ).select_related('module')
+                module_code__is_active=True
+            ).select_related('module_code')
 
-            module_roles = {umr.module.code: umr.role for umr in user_module_roles}
+            module_roles = {umr.module_code_id: umr.role for umr in user_module_roles}
             # result: {"eorder": "editor", "hrm": "viewer"}
 
             payload = {
@@ -160,10 +160,10 @@ class MenuAccessMatrixView(BaseAuthenticatedView):
 
             user_module_roles = user.module_roles.filter(
                 is_active=True,
-                module__is_active=True
-            ).select_related('module')
+                module_code__is_active=True
+            ).select_related('module_code')
 
-            result = {umr.module.code: umr.role for umr in user_module_roles}
+            result = {umr.module_code_id: umr.role for umr in user_module_roles}
             return Response(result, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -214,10 +214,10 @@ class ImpersonateView(BaseAuthenticatedView):
 
         user_module_roles = target_user.module_roles.filter(
             is_active=True,
-            module__is_active=True
-        ).select_related('module')
+            module_code__is_active=True
+        ).select_related('module_code')
 
-        module_roles = {umr.module.code: umr.role for umr in user_module_roles}
+        module_roles = {umr.module_code_id: umr.role for umr in user_module_roles}
 
         impersonate_payload = {
             "user_id": str(target_user.id),

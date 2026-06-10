@@ -55,15 +55,21 @@ class UserModuleRole(BaseModel):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='module_roles')
-    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='user_roles')
+    module_code = models.ForeignKey(
+        Module,
+        to_field='code',
+        db_column='module_code',
+        on_delete=models.CASCADE,
+        related_name='user_roles'
+    )
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_VIEWER)
 
     class Meta:
         db_table = 'user_module_role'
-        unique_together = ('user', 'module')  # satu role per module per user
+        unique_together = ('user', 'module_code')  # satu role per module per user
 
     def __str__(self):
-        return f"{self.user} - {self.module.code} ({self.role})"
+        return f"{self.user} - {self.module_code_id} ({self.role})"
 
 
 class ModuleMatrix(ITamModule):

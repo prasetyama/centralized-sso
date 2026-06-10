@@ -18,14 +18,14 @@ class ModuleAdmin(admin.ModelAdmin):
 @admin.register(UserModuleRole)
 class UserModuleRoleAdmin(admin.ModelAdmin):
     list_display = ('user_email', 'module_name', 'role', 'is_active')
-    list_filter = ('role', 'is_active', 'module')
-    search_fields = ('user__email', 'module__name', 'module__code')
-    ordering = ('user__email', 'module__code')
+    list_filter = ('role', 'is_active', 'module_code')
+    search_fields = ('user__email', 'module_code__name', 'module_code__code')
+    ordering = ('user__email', 'module_code__code')
 
     def user_email(self, obj):
         return obj.user.email
     user_email.short_description = 'User Email'
 
     def module_name(self, obj):
-        return f"{obj.module.name} ({obj.module.code})"
+        return f"{obj.module_code.name} ({obj.module_code.code})"
     module_name.short_description = 'Module'
