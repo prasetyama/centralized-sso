@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 
-from sso_core.models import User, Module, ModuleMatrix
+from sso_core.models import User, Module, ModuleMatrix, UserModuleRole
 from sso_core.serializers import UserSerializer, ModuleMatrixSerializer, GoogleLoginSerializer
 
 
@@ -79,32 +79,21 @@ class GoogleLoginView(APIView):
             jwt_algorithm = os.getenv('JWT_ALGORITHM')
             access_token_lifetime = int(os.getenv('ACCESS_TOKEN_LIFETIME', '60'))
             
-            # Fetch user's menu access to embed in token
-            menu_access = {}
+            # Fetch module access from ModuleMatrix (external table)
             module_access = {}
-
             user_module_access = ModuleMatrix.objects.filter(email=email)
-            
             if user_module_access:
                 module_access = {item.module: item.operator for item in user_module_access}
-                
+
+            # Fetch module roles from UserModuleRole (viewer/editor per module)
             user_module_roles = user.module_roles.filter(
-                is_active=True, 
-                role__is_active=True, 
+                is_active=True,
                 module__is_active=True
-            ).select_related('module', 'role', 'role__menu')
-            
-            for umr in user_module_roles:
-                module_code = umr.module.code
-                if module_code not in menu_access:
-                    menu_access[module_code] = {}
-                    
-                menu_code = umr.role.menu.code
-                if menu_code not in menu_access[module_code]:
-                    menu_access[module_code][menu_code] = []
-                    
-                menu_access[module_code][menu_code].append(umr.role.key)
-            
+            ).select_related('module')
+
+            module_roles = {umr.module.code: umr.role for umr in user_module_roles}
+            # result: {"eorder": "editor", "hrm": "viewer"}
+
             payload = {
                 "user_id": str(user.id),
                 "email": user.email,
@@ -112,8 +101,8 @@ class GoogleLoginView(APIView):
                 "department": user.department,
                 "role": user.role,
                 "image": user.image,
-                "menu_access": menu_access,
                 "module_access": module_access,
+                "module_roles": module_roles,
                 "exp": datetime.utcnow() + timedelta(minutes=access_token_lifetime),
                 "iat": datetime.utcnow()
             }
@@ -153,55 +142,35 @@ class UserModulesView(BaseAuthenticatedView):
 class MenuAccessMatrixView(BaseAuthenticatedView):
     def get(self, request):
         """
-        Returns a matrix showing which roles have access to which menus within each module.
-        
+        Returns the authenticated user's role per module.
+
         Example Output:
         {
-            "ERP": {
-                "ORDER": {
-                    "DASHBOARD": ["admin", "supervisor", "sales", "finance"],
-                    "CREATE": ["admin", "supervisor", "sales"],
-                    "APPROVAL": ["admin", "finance"],
-                    "ADMIN": ["admin"]
-                },
-                "REPORT": {
-                    "SALES": ["admin", "sales", "finance"],
-                    "INVENTORY": ["admin"]
-                }
-            }
+            "eorder": "editor",
+            "hrm": "viewer"
         }
         """
         try:
             payload = self.get_user_from_token(request)
-            
-            # Get all modules
-            modules = Module.objects.filter(is_active=True)
-            
-            access_matrix = {}
-            
-            for module in modules:
-                module_code = module.code
-                access_matrix[module_code] = {}
-                
-                # Get all menus for this module
-                menus = module.menus.filter(is_active=True)
-                
-                for menu in menus:
-                    menu_code = menu.code
-                    access_matrix[module_code][menu_code] = []
-                    
-                    # Get all roles that have access to this menu
-                    roles = menu.roles.filter(is_active=True)
-                    
-                    for role in roles:
-                        access_matrix[module_code][menu_code].append(role.key)
-            
-            return Response(access_matrix, status=status.HTTP_200_OK)
-            
+            email = payload.get('email')
+
+            user = User.objects.filter(email=email, status=1).first()
+            if not user:
+                return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            user_module_roles = user.module_roles.filter(
+                is_active=True,
+                module__is_active=True
+            ).select_related('module')
+
+            result = {umr.module.code: umr.role for umr in user_module_roles}
+            return Response(result, status=status.HTTP_200_OK)
+
         except Exception as e:
             import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
 
 class ImpersonateView(BaseAuthenticatedView):
     """
@@ -237,28 +206,18 @@ class ImpersonateView(BaseAuthenticatedView):
         jwt_algorithm = os.getenv('JWT_ALGORITHM')
         access_token_lifetime = int(os.getenv('ACCESS_TOKEN_LIFETIME', '60'))
 
-        # Build menu_access and module_access for the target user
-        menu_access = {}
+        # Build module_access and module_roles for the target user
         module_access = {}
-
         user_module_access = ModuleMatrix.objects.filter(email__iexact=target_email)
         if user_module_access:
             module_access = {item.module: item.operator for item in user_module_access}
 
         user_module_roles = target_user.module_roles.filter(
             is_active=True,
-            role__is_active=True,
             module__is_active=True
-        ).select_related('module', 'role', 'role__menu')
+        ).select_related('module')
 
-        for umr in user_module_roles:
-            module_code = umr.module.code
-            if module_code not in menu_access:
-                menu_access[module_code] = {}
-            menu_code = umr.role.menu.code
-            if menu_code not in menu_access[module_code]:
-                menu_access[module_code][menu_code] = []
-            menu_access[module_code][menu_code].append(umr.role.key)
+        module_roles = {umr.module.code: umr.role for umr in user_module_roles}
 
         impersonate_payload = {
             "user_id": str(target_user.id),
@@ -267,8 +226,8 @@ class ImpersonateView(BaseAuthenticatedView):
             "department": target_user.department,
             "role": target_user.role,
             "image": target_user.image,
-            "menu_access": menu_access,
             "module_access": module_access,
+            "module_roles": module_roles,
             "impersonated_by": payload.get('email'),  # audit trail
             "exp": datetime.utcnow() + timedelta(minutes=access_token_lifetime),
             "iat": datetime.utcnow(),

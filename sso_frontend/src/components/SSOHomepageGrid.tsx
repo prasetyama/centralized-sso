@@ -70,7 +70,7 @@ const ImpersonateModal = ({
           </div>
           <button
             onClick={onClose}
-            className="text-white/60 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10"
+            className="text-white/60 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10 cursor-pointer"
           >
             <X size={18} />
           </button>

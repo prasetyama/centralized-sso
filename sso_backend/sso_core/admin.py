@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Module, Role, Menu, UserModuleRole
+from .models import User, Module, UserModuleRole
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -15,23 +15,17 @@ class ModuleAdmin(admin.ModelAdmin):
     search_fields = ('code', 'name')
     ordering = ('code',)
 
-@admin.register(Role)
-class RoleAdmin(admin.ModelAdmin):
-    list_display = ('key', 'name', 'menu__name', 'is_active')
-    list_filter = ('menu__name', 'is_active')
-    search_fields = ('key', 'name', 'menu__name')
-    ordering = ('menu__name', 'key')
-
-@admin.register(Menu)
-class MenuAdmin(admin.ModelAdmin):
-    list_display = ('code', 'name', 'module__name', 'is_active')
-    list_filter = ('module__name', 'is_active')
-    search_fields = ('code', 'name', 'module__name')
-    ordering = ('module__name', 'code')
-
-
 @admin.register(UserModuleRole)
 class UserModuleRoleAdmin(admin.ModelAdmin):
-    list_display = ('user__email', 'module__name', 'role__key', 'is_active')
-    list_filter = ('user__email', 'module__name', 'role__key')
-    search_fields = ('user__email', 'module__name', 'role__key')
+    list_display = ('user_email', 'module_name', 'role', 'is_active')
+    list_filter = ('role', 'is_active', 'module')
+    search_fields = ('user__email', 'module__name', 'module__code')
+    ordering = ('user__email', 'module__code')
+
+    def user_email(self, obj):
+        return obj.user.email
+    user_email.short_description = 'User Email'
+
+    def module_name(self, obj):
+        return f"{obj.module.name} ({obj.module.code})"
+    module_name.short_description = 'Module'

@@ -44,40 +44,26 @@ class User(ITamModule):
     def __str__(self):
         return f"{self.email}"
 
-class Menu(BaseModel):
-    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='menus')
-    code = models.CharField(max_length=50, db_index=True) # e.g., 'ORDER_LIST'
-    name = models.CharField(max_length=100)
-
-    class Meta:
-        db_table = 'menu'
-        unique_together = ('module', 'code')
-
-    def __str__(self):
-        return f"{self.name} ({self.code})"
-
-class Role(BaseModel):
-    menu = models.ForeignKey(Menu, on_delete=models.CASCADE, related_name='roles')
-    name = models.CharField(max_length=100) # e.g., 'viewer_dashboard'
-    key = models.CharField(max_length=150, unique=True, db_index=True) # e.g., 'eorder.viewer_dashboard'
-
-    class Meta:
-        db_table = 'role'
-        unique_together = ('menu', 'key')
-
-    def __str__(self):
-        return f"{self.name} ({self.key})"
-
-
-
 class UserModuleRole(BaseModel):
+    ROLE_VIEWER = 'viewer'
+    ROLE_EDITOR = 'editor'
+    ROLE_ADMIN = 'admin'
+    ROLE_CHOICES = [
+        (ROLE_VIEWER, 'Viewer'),
+        (ROLE_EDITOR, 'Editor'),
+        (ROLE_ADMIN, 'Admin'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='module_roles')
-    module = models.ForeignKey(Module, on_delete=models.CASCADE)
-    role = models.ForeignKey(Role, on_delete=models.CASCADE)
+    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='user_roles')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_VIEWER)
 
     class Meta:
         db_table = 'user_module_role'
-        unique_together = ('user', 'module', 'role')
+        unique_together = ('user', 'module')  # satu role per module per user
+
+    def __str__(self):
+        return f"{self.user} - {self.module.code} ({self.role})"
 
 
 class ModuleMatrix(ITamModule):
