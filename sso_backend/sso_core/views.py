@@ -212,7 +212,6 @@ class ImpersonateView(BaseAuthenticatedView):
             module_access = {item.module: item.operator for item in user_module_access}
 
         user_module_roles = target_user.module_roles.filter(
-            is_active=True,
             module_code__is_active=True
         ).select_related('module_code')
 
