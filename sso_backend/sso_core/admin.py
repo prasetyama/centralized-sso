@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Module, UserModuleRole
+from .models import User, Module, UserModuleRole, ModuleMatrix
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -14,6 +14,13 @@ class ModuleAdmin(admin.ModelAdmin):
     list_filter = ('is_active',)
     search_fields = ('code', 'name')
     ordering = ('code',)
+
+@admin.register(ModuleMatrix)
+class ModuleMatrixAdmin(admin.ModelAdmin):
+    list_display = ('email', 'module', 'operator')
+    list_filter = ('email',)
+    search_fields = ('email', 'module')
+    ordering = ('email',)
 
 @admin.register(UserModuleRole)
 class UserModuleRoleAdmin(admin.ModelAdmin):
