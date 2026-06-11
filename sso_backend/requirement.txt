@@ -1,4 +1,5 @@
-Django>=4.2,<5.0
+Django==6.0.6
+google-auth
 djangorestframework
 mysqlclient
 django-cors-headers
