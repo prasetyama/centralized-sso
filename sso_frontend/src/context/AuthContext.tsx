@@ -49,6 +49,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setModulesState([]);
     localStorage.removeItem('sso_token');
     localStorage.removeItem('sso_user');
+
+    const logoutChannel = new BroadcastChannel('logout_channel');
+    logoutChannel.postMessage('logout');
+    logoutChannel.close();
+
     if (redirectUrl) {
       window.location.href = redirectUrl;
     } else {
