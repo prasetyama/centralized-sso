@@ -93,6 +93,17 @@ class GoogleLoginView(APIView):
             module_roles = {umr.module_code_id: umr.role for umr in user_module_roles}
             # result: {"eorder": "editor", "hrm": "viewer"}
 
+            # Fetch module details for app drawer (code, name, redirect_url)
+            modules_list = []
+            if module_access:
+                authorized_modules = Module.objects.filter(
+                    code__in=module_access.keys(), is_active=True
+                )
+                modules_list = [
+                    {"code": m.code, "name": m.name, "redirect_url": m.redirect_url or ""}
+                    for m in authorized_modules
+                ]
+
             payload = {
                 "user_id": str(user.id),
                 "email": user.email,
@@ -102,6 +113,7 @@ class GoogleLoginView(APIView):
                 "image": user.image,
                 "module_access": module_access,
                 "module_roles": module_roles,
+                "modules": modules_list,
                 "exp": datetime.utcnow() + timedelta(minutes=access_token_lifetime),
                 "iat": datetime.utcnow()
             }
@@ -217,6 +229,13 @@ class ImpersonateView(BaseAuthenticatedView):
 
         module_roles = {umr.module_code_id: umr.role for umr in user_module_roles}
 
+        # Fetch module details for app drawer
+        modules_list = []
+        if module_access:
+            for modul in module_access.keys():
+                module = Module.objects.filter(code=modul, is_active=True).first()
+                modules_list.append({"code": modul, "operator": module_access[modul], "redirect_url": module.redirect_url if module else "", "name": module.name if module else ""})
+
         impersonate_payload = {
             "user_id": str(target_user.id),
             "email": target_user.email,
@@ -226,7 +245,8 @@ class ImpersonateView(BaseAuthenticatedView):
             "image": target_user.image,
             "module_access": module_access,
             "module_roles": module_roles,
-            "impersonated_by": payload.get('email'),  # audit trail
+            "modules": modules_list,
+            "impersonated_by": payload.get('email'),
             "exp": datetime.utcnow() + timedelta(minutes=access_token_lifetime),
             "iat": datetime.utcnow(),
         }
