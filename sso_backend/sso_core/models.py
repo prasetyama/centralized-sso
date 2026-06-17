@@ -81,3 +81,25 @@ class ModuleMatrix(ITamModule):
         db_table = 'module_matrix'
         managed = False  # external table, Django won't alter it
 
+class Role(ITamModule):
+    code = models.CharField(max_length=50, unique=True, db_index=True) # e.g., 'eorder'
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'aw_role'
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+class RoleMatrix(ITamModule):
+
+    dept = models.CharField(max_length=50)
+    title = models.ForeignKey(Role, to_field='code', db_column='title', on_delete=models.CASCADE, related_name='title_matrixes')
+    user = models.ForeignKey(User, to_field='email', db_column='email', on_delete=models.CASCADE, related_name='user_title_matrixes')
+
+    class Meta:
+        db_table = 'user_title_matrix'
+        managed = False
+        unique_together = ('title', 'user')
+

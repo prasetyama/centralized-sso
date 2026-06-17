@@ -11,10 +11,15 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='usermodulerole',
-            name='user',
-            field=models.ForeignKey(db_column='email', on_delete=django.db.models.deletion.CASCADE, related_name='module_roles', to='sso_core.user', to_field='email'),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AlterField(
+                    model_name='usermodulerole',
+                    name='user',
+                    field=models.ForeignKey(db_column='email', on_delete=django.db.models.deletion.CASCADE, related_name='module_roles', to='sso_core.user', to_field='email'),
+                ),
+            ],
+            database_operations=[],
         ),
         migrations.AlterModelTable(
             name='user',

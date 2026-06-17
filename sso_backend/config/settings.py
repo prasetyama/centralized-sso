@@ -130,13 +130,11 @@ STATIC_URL = 'static/'
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = os.getenv(
-    'CORS_ALLOWED_ORIGINS',
-    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5175,http://127.0.0.1:5175'
+    'CORS_ALLOWED_ORIGINS'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = os.getenv(
-    'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5175,http://127.0.0.1:5175'
+    'CSRF_TRUSTED_ORIGINS'
 ).split(',')
 
 # DRF Configuration
