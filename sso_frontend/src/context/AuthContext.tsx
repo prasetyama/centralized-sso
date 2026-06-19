@@ -14,6 +14,7 @@ export interface Module {
   module: string;
   operator: string;
   redirect_url: string;
+  role: string;
 }
 
 interface AuthContextType {

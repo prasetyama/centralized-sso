@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Module, ModuleMatrix
+from .models import User, Module, ModuleMatrix, UserModuleRole
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -11,10 +11,11 @@ class ModuleMatrixSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
     redirect_url = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = ModuleMatrix
-        fields = ['module', 'operator', 'name', 'description', 'redirect_url']
+        fields = ['module', 'operator', 'name', 'description', 'redirect_url', 'role']
 
     def get_name(self, obj):
         module = self._get_module(obj)
@@ -37,6 +38,12 @@ class ModuleMatrixSerializer(serializers.ModelSerializer):
                 code=obj.module, is_active=True
             ).first()
         return self._module_cache[obj.module]
+
+    def get_role(self, obj):
+        user_module_role = UserModuleRole.objects.filter(
+            user__email=obj.email, module_code_id=obj.module
+        ).first()
+        return user_module_role.role if user_module_role else "viewer"
 
 class GoogleLoginSerializer(serializers.Serializer):
     token = serializers.CharField(required=True)

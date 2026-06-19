@@ -314,7 +314,7 @@ export const SSOHomepageGrid = () => {
                   />
                 </div>
                 <h3 className="text-lg font-bold text-gray-800 mb-2">{mod.module}</h3>
-                <p className="text-sm text-gray-500 flex-1">{mod.operator || 'Access module application.'}</p>
+                <p className="text-sm text-gray-500 flex-1">{mod.role}</p>
               </div>
             ))}
           </div>
