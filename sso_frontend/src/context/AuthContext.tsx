@@ -29,14 +29,42 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 
+const getCookieDomain = () => {
+  return window.location.hostname.includes('ceresnl.com') ? '.ceresnl.com' : window.location.hostname;
+};
+
+const setCookie = (name: string, value: string, days = 1) => {
+  const domain = getCookieDomain();
+  const date = new Date();
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+  const expires = "expires=" + date.toUTCString();
+  document.cookie = name + "=" + encodeURIComponent(value) + ";" + expires + ";domain=" + domain + ";path=/;SameSite=Lax";
+};
+
+const getCookie = (name: string) => {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for(let i=0;i < ca.length;i++) {
+    let c = ca[i];
+    while (c.charAt(0)==' ') c = c.substring(1,c.length);
+    if (c.indexOf(nameEQ) == 0) return decodeURIComponent(c.substring(nameEQ.length,c.length));
+  }
+  return null;
+};
+
+const removeCookie = (name: string) => {
+  const domain = getCookieDomain();
+  document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;domain=" + domain + ";path=/";
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem('sso_user');
+    const savedUser = getCookie('sso_user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('sso_token'));
+  const [token, setToken] = useState<string | null>(() => getCookie('sso_token'));
   const [modules, setModulesState] = useState<Module[]>([]);
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [errorData, setErrorData] = useState<string>('');
@@ -48,8 +76,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setToken(null);
     setModulesState([]);
-    localStorage.removeItem('sso_token');
-    localStorage.removeItem('sso_user');
+    removeCookie('sso_token');
+    removeCookie('sso_user');
 
     const logoutChannel = new BroadcastChannel('logout_channel');
     logoutChannel.postMessage('logout');
@@ -106,8 +134,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = (userData: User, authToken: string) => {
     setUser(userData);
     setToken(authToken);
-    localStorage.setItem('sso_token', authToken);
-    localStorage.setItem('sso_user', JSON.stringify(userData));
+    setCookie('sso_token', authToken, 1);
+    setCookie('sso_user', JSON.stringify(userData), 1);
   };
 
   return (
