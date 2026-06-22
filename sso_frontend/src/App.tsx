@@ -14,10 +14,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const Logout = () => {
-  const { isAuthenticated, logout } = useAuth();
-  if (isAuthenticated) {
+  const { logout } = useAuth();
+  
+  React.useEffect(() => {
     logout();
-  }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return null;
 };
 
