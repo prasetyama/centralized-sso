@@ -1,5 +1,6 @@
+from django import forms
 from django.contrib import admin
-from .models import User, Module, UserModuleRole, ModuleMatrix, Role, RoleMatrix
+from .models import User, Module, UserModuleRole, ModuleMatrix, Role, TitleMatrix, LocalUser
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -22,19 +23,67 @@ class RoleAdmin(admin.ModelAdmin):
     search_fields = ('name', 'code')
     ordering = ('code',)
 
-@admin.register(RoleMatrix)
-class RoleMatrixAdmin(admin.ModelAdmin):
-    list_display = ('user_email', 'dept', 'title')
-    list_filter = ('dept', 'title', 'user')
-    search_fields = ('user__email', 'dept', 'title')
-    ordering = ('user__email',)
+class TitleMatrixForm(forms.ModelForm):
+    user = forms.ChoiceField(choices=[], required=True, label="User (Email/Username)")
 
-    def user_email(self, obj):
-        return obj.user.email
-    user_email.short_description = 'User Email'
+    class Meta:
+        model = TitleMatrix
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user_choices = []
+        try:
+            # SSO Users
+            for u in User.objects.all():
+                user_choices.append((u.email, f"{u.name} ({u.email}) [SSO]"))
+            # Local Users
+            for lu in LocalUser.objects.all():
+                user_choices.append((lu.username, f"{lu.fname or 'No Name'} ({lu.username}) [Local]"))
+            
+            user_choices.sort(key=lambda x: str(x[1]).lower())
+        except Exception:
+            pass # Handle DB not ready yet
+            
+        user_choices.insert(0, ('', '---------'))
+        self.fields['user'].choices = user_choices
+
+@admin.register(TitleMatrix)
+class TitleMatrixAdmin(admin.ModelAdmin):
+    form = TitleMatrixForm
+    list_display = ('user', 'dept', 'title')
+    list_filter = ('dept', 'title', 'user')
+    search_fields = ('user', 'dept', 'title')
+    ordering = ('user',)
+
+class ModuleMatrixForm(forms.ModelForm):
+    email = forms.ChoiceField(choices=[], required=True, label="User (Email/Username)")
+
+    class Meta:
+        model = ModuleMatrix
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user_choices = []
+        try:
+            # SSO Users
+            for u in User.objects.all():
+                user_choices.append((u.email, f"{u.name} ({u.email}) [SSO]"))
+            # Local Users
+            for lu in LocalUser.objects.all():
+                user_choices.append((lu.username, f"{lu.fname or 'No Name'} ({lu.username}) [Local]"))
+            
+            user_choices.sort(key=lambda x: str(x[1]).lower())
+        except Exception:
+            pass # Handle DB not ready yet
+            
+        user_choices.insert(0, ('', '---------'))
+        self.fields['email'].choices = user_choices
 
 @admin.register(ModuleMatrix)
 class ModuleMatrixAdmin(admin.ModelAdmin):
+    form = ModuleMatrixForm
     list_display = ('email', 'module', 'operator')
     list_filter = ('email',)
     search_fields = ('email', 'module')
@@ -54,3 +103,9 @@ class UserModuleRoleAdmin(admin.ModelAdmin):
     def module_name(self, obj):
         return f"{obj.module_code.name} ({obj.module_code.code})"
     module_name.short_description = 'Module'
+
+@admin.register(LocalUser)
+class LocalUserAdmin(admin.ModelAdmin):
+    list_display = ('username', 'fname', 'role', 'department')
+    list_filter = ('role', 'department')
+    search_fields = ('username', 'fname')

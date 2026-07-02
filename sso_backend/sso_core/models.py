@@ -30,7 +30,7 @@ class Module(BaseModel):
 
 class User(ITamModule):
     # google_uid = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
-    email = models.EmailField(unique=True, db_index=True)
+    email = models.CharField(max_length=255, unique=True, db_index=True)
     name = models.CharField(max_length=150)
     department = models.CharField(max_length=150)
     role = models.CharField(max_length=50)
@@ -75,7 +75,7 @@ class UserModuleRole(ITamModule):
 
 
 class ModuleMatrix(ITamModule):
-    email = models.EmailField(unique=True, db_index=True)
+    email = models.CharField(max_length=255, unique=True, db_index=True)
     module = models.CharField(max_length=50, db_index=True)
     operator = models.CharField(max_length=50, db_index=True)
     
@@ -94,14 +94,29 @@ class Role(ITamModule):
     def __str__(self):
         return f"{self.name} ({self.code})"
 
-class RoleMatrix(ITamModule):
+class TitleMatrix(ITamModule):
 
     dept = models.CharField(max_length=50)
     title = models.ForeignKey(Role, to_field='code', db_column='title', on_delete=models.CASCADE, related_name='title_matrixes')
-    user = models.ForeignKey(User, to_field='email', db_column='email', on_delete=models.CASCADE, related_name='user_title_matrixes')
+    user = models.CharField(max_length=255, db_column='email')
 
     class Meta:
         db_table = 'user_title_matrix'
         managed = False
         unique_together = ('title', 'user')
+
+class LocalUser(models.Model):
+    username = models.CharField(max_length=255, unique=True)
+    password = models.CharField(max_length=255)
+    role = models.CharField(max_length=50, blank=True, null=True)
+    fname = models.CharField(max_length=255, blank=True, null=True)
+    department = models.CharField(max_length=255, blank=True, null=True)
+    region = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        db_table = 'users'
+        managed = False
+
+    def __str__(self):
+        return f"{self.username}"
 

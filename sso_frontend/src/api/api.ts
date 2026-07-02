@@ -30,6 +30,19 @@ export const googleLogin = async (token: string) => {
     }
 }
 
+export const manualLogin = async (username: string, password: string) => {
+    try {
+        const response = await api.post('/auth/manual/', {
+            username: username,
+            password: password
+        });
+        return response;
+    } catch (error) {
+        console.error('Error with manual login:', error);
+        throw error;
+    }
+}
+
 export const fetchUserMenuAccess = async (token: string) => {
     try {
         const response = await api.get('/user/menu-access/', {

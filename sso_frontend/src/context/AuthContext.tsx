@@ -12,6 +12,7 @@ export interface User {
 
 export interface Module {
   module: string;
+  name: string;
   operator: string;
   redirect_url: string;
   role: string;
@@ -44,10 +45,10 @@ const setCookie = (name: string, value: string, days = 1) => {
 const getCookie = (name: string) => {
   const nameEQ = name + "=";
   const ca = document.cookie.split(';');
-  for(let i=0;i < ca.length;i++) {
+  for (let i = 0; i < ca.length; i++) {
     let c = ca[i];
-    while (c.charAt(0)==' ') c = c.substring(1,c.length);
-    if (c.indexOf(nameEQ) == 0) return decodeURIComponent(c.substring(nameEQ.length,c.length));
+    while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) == 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
   }
   return null;
 };

@@ -8,7 +8,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 
-from sso_core.models import User, Module, ModuleMatrix, UserModuleRole
+from sso_core.models import User, Module, ModuleMatrix, UserModuleRole, LocalUser, TitleMatrix
+import bcrypt
 from sso_core.serializers import UserSerializer, ModuleMatrixSerializer, GoogleLoginSerializer
 
 
@@ -92,7 +93,7 @@ class GoogleLoginView(APIView):
 
             module_roles = {umr.module_code_id: umr.role for umr in user_module_roles}
             # result: {"eorder": "editor", "hrm": "viewer"}
-            title_matrix = user.user_title_matrixes.first()
+            title_matrix = TitleMatrix.objects.filter(user=user.email).first()
             title = title_matrix.title_id if title_matrix else None
 
             payload = {
@@ -220,7 +221,7 @@ class ImpersonateView(BaseAuthenticatedView):
 
         module_roles = {umr.module_code_id: umr.role for umr in user_module_roles}
 
-        title_matrix = target_user.user_title_matrixes.first()
+        title_matrix = TitleMatrix.objects.filter(user=target_user.email).first()
         title = title_matrix.title_id if title_matrix else None
 
         impersonate_payload = {
@@ -252,4 +253,73 @@ class ImpersonateView(BaseAuthenticatedView):
                 "title": title,
             },
             "impersonated_by": payload.get('email'),
+        }, status=status.HTTP_200_OK)
+
+class ManualLoginView(APIView):
+    """
+    Validates Manual Login Token, gets User, and issues JWT.
+    """
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+
+        if not username or not password:
+            return Response({"error": "username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        local_user = LocalUser.objects.filter(username__iexact=username).first()
+        if not local_user:
+            return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        if not bcrypt.checkpw(password.encode('utf-8'), local_user.password.encode('utf-8')):
+            return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        jwt_secret = os.getenv('JWT_SECRET')
+        jwt_algorithm = os.getenv('JWT_ALGORITHM')
+        access_token_lifetime = int(os.getenv('ACCESS_TOKEN_LIFETIME', '60'))
+        
+        # Fetch module access from ModuleMatrix using local_user.username
+        module_access = {}
+        user_module_access = ModuleMatrix.objects.filter(email=local_user.username)
+        if user_module_access:
+            module_access = {item.module: item.operator for item in user_module_access}
+
+        # Fetch module roles from UserModuleRole using local_user.username
+        user_module_roles = UserModuleRole.objects.filter(
+            user__email=local_user.username,
+            module_code__is_active=True
+        ).select_related('module_code')
+
+        module_roles = {umr.module_code_id: umr.role for umr in user_module_roles}
+        
+        title_matrix = TitleMatrix.objects.filter(user=local_user.username).first()
+        title = title_matrix.title_id if title_matrix else None
+
+        payload = {
+            "user_id": str(local_user.id),
+            "email": local_user.username,
+            "name": local_user.fname,
+            "department": local_user.department,
+            "role": local_user.role,
+            "image": None,
+            "title": title,
+            "module_access": module_access,
+            "module_roles": module_roles,
+            "exp": datetime.utcnow() + timedelta(minutes=access_token_lifetime),
+            "iat": datetime.utcnow()
+        }
+        access_token = jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm)
+        
+        # Construct user_data directly to match UserSerializer fields
+        user_data = {
+            "id": str(local_user.id),
+            "email": local_user.username,
+            "name": local_user.fname,
+            "department": local_user.department,
+            "role": local_user.role,
+            "image": None
+        }
+        
+        return Response({
+            "access_token": access_token,
+            "user": user_data
         }, status=status.HTTP_200_OK)
