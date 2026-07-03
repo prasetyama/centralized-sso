@@ -1,7 +1,11 @@
 import os
 import jwt
+import json
+import logging
 import requests as py_requests
 from datetime import datetime, timedelta
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -11,6 +15,87 @@ from django.conf import settings
 from sso_core.models import User, Module, ModuleMatrix, UserModuleRole, LocalUser, TitleMatrix
 import bcrypt
 from sso_core.serializers import UserSerializer, ModuleMatrixSerializer, GoogleLoginSerializer
+
+
+# ─── File-based Login Logger Setup ─────────────────────────────────────────────
+LOG_DIR = Path(settings.BASE_DIR) / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+LOGIN_LOG_FILE = LOG_DIR / 'login.jsonl'
+
+_login_logger = logging.getLogger('login_audit')
+_login_logger.setLevel(logging.INFO)
+_login_logger.propagate = False
+
+if not _login_logger.handlers:
+    handler = RotatingFileHandler(
+        str(LOGIN_LOG_FILE),
+        maxBytes=10 * 1024 * 1024,  # 10 MB per file
+        backupCount=5,              # Keep 5 rotated files
+        encoding='utf-8',
+    )
+    handler.setFormatter(logging.Formatter('%(message)s'))
+    _login_logger.addHandler(handler)
+
+
+def get_client_ip(request):
+    """Extract real client IP, considering reverse proxies."""
+    x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded:
+        return x_forwarded.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+
+def log_login(request, email, method, success, error_message=None):
+    """Record a login attempt to the JSONL log file."""
+    try:
+        entry = {
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'email': email or 'unknown',
+            'method': method,
+            'status': 'success' if success else 'failed',
+            'ip_address': get_client_ip(request),
+            'user_agent': (request.META.get('HTTP_USER_AGENT', '') or '')[:500],
+            'error': error_message,
+        }
+        _login_logger.info(json.dumps(entry, ensure_ascii=False))
+    except Exception:
+        pass  # Logging should never break the login flow
+
+
+def _read_login_logs(email=None, limit=None):
+    """Read login logs from the JSONL file, newest first. Optionally filter by email."""
+    results = []
+    try:
+        if not LOGIN_LOG_FILE.exists():
+            return results
+        with open(LOGIN_LOG_FILE, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        # Read in reverse (newest first)
+        for line in reversed(lines):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                if email and entry.get('email', '').lower() != email.lower():
+                    continue
+                results.append(entry)
+                if limit and len(results) >= limit:
+                    break
+            except json.JSONDecodeError:
+                continue
+    except Exception:
+        pass
+    return results
+
+
+def get_last_login(email):
+    """Get the most recent successful login timestamp for a user."""
+    logs = _read_login_logs(email=email)
+    for log in logs:
+        if log.get('status') == 'success':
+            return log.get('timestamp')
+    return None
 
 
 class BaseAuthenticatedView(APIView):
@@ -64,17 +149,12 @@ class GoogleLoginView(APIView):
             # Get or create User
             user = User.objects.filter(email=email, status=1).first()
             if not user:
-                # user = User.objects.create(
-                #     email=email,
-                #     name=idinfo.get('given_name', '') + ' ' + idinfo.get('family_name', ''),
-                #     department=idinfo.get('department', ''),
-                #     role=idinfo.get('role', ''),
-                #     image=idinfo.get('picture', ''),
-                #     status=1
-                # )
-
+                log_login(request, email, 'google', False, 'User not found')
                 return Response({"error": "User not found"}, status=status.HTTP_401_UNAUTHORIZED)
             
+            # Get last login BEFORE recording current one
+            last_login = get_last_login(email)
+
             # Issue JWT
             jwt_secret = os.getenv('JWT_SECRET')
             jwt_algorithm = os.getenv('JWT_ALGORITHM')
@@ -112,13 +192,18 @@ class GoogleLoginView(APIView):
             access_token = jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm)
             
             user_data = UserSerializer(user).data
+
+            # Log successful login
+            log_login(request, email, 'google', True)
             
             return Response({
                 "access_token": access_token,
-                "user": user_data
+                "user": user_data,
+                "last_login": last_login,
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
+            log_login(request, email if 'email' in dir() else 'unknown', 'google', False, str(e))
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -241,6 +326,10 @@ class ImpersonateView(BaseAuthenticatedView):
 
         access_token = jwt.encode(impersonate_payload, jwt_secret, algorithm=jwt_algorithm)
 
+        # Log impersonation (logged under target email, with impersonated_by in context)
+        log_login(request, target_email, 'impersonate', True,
+                  f"Impersonated by {payload.get('email')}")
+
         return Response({
             "access_token": access_token,
             "user": {
@@ -268,11 +357,16 @@ class ManualLoginView(APIView):
 
         local_user = LocalUser.objects.filter(username__iexact=username).first()
         if not local_user:
+            log_login(request, username or 'unknown', 'manual', False, 'Invalid username')
             return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
         
         if not bcrypt.checkpw(password.encode('utf-8'), local_user.password.encode('utf-8')):
+            log_login(request, username, 'manual', False, 'Invalid password')
             return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
         
+        # Get last login BEFORE recording current one
+        last_login = get_last_login(local_user.username)
+
         jwt_secret = os.getenv('JWT_SECRET')
         jwt_algorithm = os.getenv('JWT_ALGORITHM')
         access_token_lifetime = int(os.getenv('ACCESS_TOKEN_LIFETIME', '60'))
@@ -318,8 +412,48 @@ class ManualLoginView(APIView):
             "role": local_user.role,
             "image": None
         }
+
+        # Log successful login
+        log_login(request, local_user.username, 'manual', True)
         
         return Response({
             "access_token": access_token,
-            "user": user_data
+            "user": user_data,
+            "last_login": last_login,
         }, status=status.HTTP_200_OK)
+
+
+class LoginHistoryView(BaseAuthenticatedView):
+    """
+    Returns login history for the authenticated user, including last_login.
+    Reads from the JSONL log file.
+    """
+    def get(self, request):
+        try:
+            payload = self.get_user_from_token(request)
+            email = payload.get('email')
+
+            logs = _read_login_logs(email=email, limit=20)
+            last_login = None
+            for log in logs:
+                if log.get('status') == 'success':
+                    last_login = log.get('timestamp')
+                    break
+
+            return Response({
+                "last_login": last_login,
+                "history": [
+                    {
+                        "method": log.get('method'),
+                        "status": log.get('status'),
+                        "ip_address": log.get('ip_address'),
+                        "user_agent": log.get('user_agent'),
+                        "error_message": log.get('error'),
+                        "timestamp": log.get('timestamp'),
+                    }
+                    for log in logs
+                ]
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)

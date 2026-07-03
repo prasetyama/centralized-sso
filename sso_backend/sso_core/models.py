@@ -120,3 +120,33 @@ class LocalUser(models.Model):
     def __str__(self):
         return f"{self.username}"
 
+
+class LoginLog(models.Model):
+    LOGIN_METHOD_CHOICES = [
+        ('google', 'Google OAuth'),
+        ('manual', 'Manual Login'),
+        ('impersonate', 'Impersonate'),
+    ]
+    STATUS_CHOICES = [
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.CharField(max_length=255, db_index=True)  # email or username
+    login_method = models.CharField(max_length=20, choices=LOGIN_METHOD_CHOICES)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, null=True)
+    error_message = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'login_log'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['email', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.email} [{self.login_method}] {self.status} @ {self.created_at}"
