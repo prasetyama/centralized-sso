@@ -75,13 +75,14 @@ class UserModuleRole(ITamModule):
 
 
 class ModuleMatrix(ITamModule):
-    email = models.CharField(max_length=255, unique=True, db_index=True)
+    email = models.CharField(max_length=255, db_index=True)
     module = models.CharField(max_length=50, db_index=True)
     operator = models.CharField(max_length=50, db_index=True)
     
     class Meta:
         db_table = 'module_matrix'
         managed = False  # external table, Django won't alter it
+        unique_together = ('email', 'module')
 
 class Role(ITamModule):
     code = models.CharField(max_length=50, unique=True, db_index=True) # e.g., 'eorder'
