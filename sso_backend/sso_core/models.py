@@ -88,6 +88,8 @@ class Role(ITamModule):
     code = models.CharField(max_length=50, unique=True, db_index=True) # e.g., 'eorder'
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'aw_role'
