@@ -7,4 +7,5 @@ pyjwt
 django-filter
 django-environ
 python-dotenv
-requests==2.34.2bcrypt
+requests
+bcrypt

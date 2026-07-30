@@ -49,11 +49,13 @@ class UserModuleRole(ITamModule):
     ROLE_EDITOR = 'editor'
     ROLE_ADMIN = 'admin'
     ROLE_APPROVAL = 'approval'
+    ROLE_USER_AUS = 'user_aus'
     ROLE_CHOICES = [
         (ROLE_VIEWER, 'Viewer'),
         (ROLE_EDITOR, 'Editor'),
         (ROLE_ADMIN, 'Admin'),
         (ROLE_APPROVAL, 'Approval'),
+        (ROLE_USER_AUS, 'User AUS'),
     ]
 
     user = models.ForeignKey(User, to_field='email', db_column='email', on_delete=models.CASCADE, related_name='module_roles')
