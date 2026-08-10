@@ -58,7 +58,7 @@ class UserModuleRole(ITamModule):
         (ROLE_USER_AUS, 'User AUS'),
     ]
 
-    user = models.ForeignKey(User, to_field='email', db_column='email', on_delete=models.CASCADE, related_name='module_roles')
+    user = models.CharField(max_length=255, db_column='email')
     module_code = models.ForeignKey(
         Module,
         to_field='code',

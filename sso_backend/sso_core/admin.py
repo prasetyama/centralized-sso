@@ -91,16 +91,38 @@ class ModuleMatrixAdmin(admin.ModelAdmin):
     search_fields = ('email', 'module')
     ordering = ('email',)
 
+class UserModuleRoleForm(forms.ModelForm):
+    user = forms.ChoiceField(choices=[], required=True, label="User (Email/Username)")
+
+    class Meta:
+        model = UserModuleRole
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user_choices = []
+        try:
+            # SSO Users
+            for u in User.objects.all():
+                user_choices.append((u.email, f"{u.name} ({u.email}) [SSO]"))
+            # Local Users
+            for lu in LocalUser.objects.all():
+                user_choices.append((lu.username, f"{lu.fname or 'No Name'} ({lu.username}) [Local]"))
+            
+            user_choices.sort(key=lambda x: str(x[1]).lower())
+        except Exception:
+            pass # Handle DB not ready yet
+            
+        user_choices.insert(0, ('', '---------'))
+        self.fields['user'].choices = user_choices
+
 @admin.register(UserModuleRole)
 class UserModuleRoleAdmin(admin.ModelAdmin):
-    list_display = ('user_email', 'module_name', 'role')
+    form = UserModuleRoleForm
+    list_display = ('user', 'module_name', 'role')
     list_filter = ('role', 'module_code')
-    search_fields = ('user__email', 'module_code__name', 'module_code__code')
-    ordering = ('user__email', 'module_code__code')
-
-    def user_email(self, obj):
-        return obj.user.email
-    user_email.short_description = 'User Email'
+    search_fields = ('user', 'module_code__name', 'module_code__code')
+    ordering = ('user', 'module_code__code')
 
     def module_name(self, obj):
         return f"{obj.module_code.name} ({obj.module_code.code})"

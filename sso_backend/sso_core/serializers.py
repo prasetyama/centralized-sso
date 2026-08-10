@@ -41,7 +41,7 @@ class ModuleMatrixSerializer(serializers.ModelSerializer):
 
     def get_role(self, obj):
         user_module_role = UserModuleRole.objects.filter(
-            user__email=obj.email, module_code_id=obj.module
+            user=obj.email, module_code_id=obj.module
         ).first()
         return user_module_role.role if user_module_role else "viewer"
 

@@ -167,7 +167,8 @@ class GoogleLoginView(APIView):
                 module_access = {item.module: item.operator for item in user_module_access}
 
             # Fetch module roles from UserModuleRole (viewer/editor per module)
-            user_module_roles = user.module_roles.filter(
+            user_module_roles = UserModuleRole.objects.filter(
+                user=user.email,
                 module_code__is_active=True
             ).select_related('module_code')
 
@@ -246,8 +247,8 @@ class MenuAccessMatrixView(BaseAuthenticatedView):
             if not user:
                 return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-            user_module_roles = user.module_roles.filter(
-                is_active=True,
+            user_module_roles = UserModuleRole.objects.filter(
+                user=email,
                 module_code__is_active=True
             ).select_related('module_code')
 
@@ -300,7 +301,8 @@ class ImpersonateView(BaseAuthenticatedView):
         if user_module_access:
             module_access = {item.module: item.operator for item in user_module_access}
 
-        user_module_roles = target_user.module_roles.filter(
+        user_module_roles = UserModuleRole.objects.filter(
+            user=target_user.email,
             module_code__is_active=True
         ).select_related('module_code')
 
@@ -379,7 +381,7 @@ class ManualLoginView(APIView):
 
         # Fetch module roles from UserModuleRole using local_user.username
         user_module_roles = UserModuleRole.objects.filter(
-            user__email=local_user.username,
+            user=local_user.username,
             module_code__is_active=True
         ).select_related('module_code')
 
