@@ -331,3 +331,10 @@ Setiap token yang diterbitkan oleh SSO Backend memiliki struktur payload sebagai
 | `/api/v1/user/login-history/` | `GET` | Bearer Token | Mengambil riwayat log login user dari file `login.jsonl` |
 
 ---
+
+## 6. Panduan Integrasi Aplikasi Eksternal
+
+Untuk petunjuk langkah demi langkah (step-by-step) integrasi aplikasi web eksternal baru dengan Centralized SSO ini, silakan merujuk ke dokumen terpisah:
+- **[PANDUAN_INTEGRASI_SSO.md](file:///home/pras/Works/sso/PANDUAN_INTEGRASI_SSO.md)**
+
+---
