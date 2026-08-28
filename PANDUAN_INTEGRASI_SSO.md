@@ -29,10 +29,10 @@ Tambahkan URL SSO di file `.env` aplikasi Anda:
 
 ```env
 # URL Frontend SSO (Tempat Login)
-VITE_SSO_URL=https://sso.ceresnl.com
+VITE_SSO_URL=https://account.ceresnl.com
 
 # URL Backend SSO API
-VITE_SSO_BACKEND_URL=https://sso-api.ceresnl.com/api/v1
+VITE_SSO_BACKEND_URL=https://account.ceresnl.com/api/v1
 ```
 
 ---
