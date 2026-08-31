@@ -459,3 +459,79 @@ class LoginHistoryView(BaseAuthenticatedView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class UserDetailByIdView(BaseAuthenticatedView):
+    """
+    Search and return user details by ID from sso_db.users (LocalUser model) or User matrix.
+    Supports GET /api/v1/users/<user_id>/ or GET /api/v1/users/?ids=1,2,3 or GET /api/v1/users/?id=1
+    """
+    def get(self, request, user_id=None):
+        try:
+            self.get_user_from_token(request)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Batch lookup via query param ?ids=1,2,3
+        ids_param = request.query_params.get('ids')
+        if ids_param:
+            id_list = [i.strip() for i in ids_param.split(',') if i.strip()]
+            local_users = LocalUser.objects.filter(id__in=id_list)
+            users_map = {}
+            for u in local_users:
+                users_map[str(u.id)] = {
+                    "id": u.id,
+                    "username": u.username,
+                    "name": u.fname or u.username,
+                    "department": u.department,
+                    "region": u.region,
+                    "role": u.role,
+                }
+
+            # Check remaining missing IDs in User matrix
+            missing_ids = [i for i in id_list if i not in users_map]
+            if missing_ids:
+                matrix_users = User.objects.filter(id__in=missing_ids)
+                for mu in matrix_users:
+                    users_map[str(mu.id)] = {
+                        "id": mu.id,
+                        "username": mu.email,
+                        "name": mu.name,
+                        "department": mu.department,
+                        "region": None,
+                        "role": mu.role,
+                    }
+
+            return Response({"users": users_map}, status=status.HTTP_200_OK)
+
+        # Single lookup by user_id from path or query param ?id=...
+        target_id = user_id or request.query_params.get('id')
+        if not target_id:
+            return Response({"error": "user_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Primary lookup: LocalUser (table sso_db.users)
+        local_user = LocalUser.objects.filter(id=target_id).first()
+        if local_user:
+            return Response({
+                "id": local_user.id,
+                "username": local_user.username,
+                "name": local_user.fname or local_user.username,
+                "department": local_user.department,
+                "region": local_user.region,
+                "role": local_user.role,
+            }, status=status.HTTP_200_OK)
+
+        # Secondary lookup: User (table User Matrix)
+        matrix_user = User.objects.filter(id=target_id).first()
+        if matrix_user:
+            return Response({
+                "id": matrix_user.id,
+                "username": matrix_user.email,
+                "name": matrix_user.name,
+                "department": matrix_user.department,
+                "region": None,
+                "role": matrix_user.role,
+            }, status=status.HTTP_200_OK)
+
+        return Response({"error": f"User with id '{target_id}' not found."}, status=status.HTTP_404_NOT_FOUND)
+
