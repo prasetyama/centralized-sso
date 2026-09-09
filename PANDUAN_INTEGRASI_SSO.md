@@ -15,12 +15,6 @@ Sebelum memulai integrasi, pastikan langkah-langkah administratif berikut telah 
      - **Nama Modul**: `My Custom Application`
      - **Redirect URL**: `https://myapp.ceresnl.com`
 
-2. **Domain & Shared Cookie Setup**:
-   - Jika aplikasi berada di bawah subdomain yang sama (misalnya `myapp.ceresnl.com` dan `sso.ceresnl.com`), cookie `sso_token` akan terberbagi secara otomatis melalui domain `.ceresnl.com`.
-
-3. **Kunci Rahasia JWT (Shared Secret)**:
-   - Pastikan backend aplikasi Anda memiliki nilai `JWT_SECRET` dan `JWT_ALGORITHM` (default: `HS256`) yang sama dengan SSO Backend jika backend Anda akan melakukan verifikasi JWT secara independen.
-
 ---
 
 ## 2. Step 1: Konfigurasi Environment Variables
