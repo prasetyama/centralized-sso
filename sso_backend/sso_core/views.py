@@ -264,8 +264,9 @@ class MenuAccessMatrixView(BaseAuthenticatedView):
 
 class ImpersonateView(BaseAuthenticatedView):
     """
-    ADMIN-only endpoint: generate a JWT token impersonating another user by email.
+    ADMIN-only endpoint: generate a JWT token impersonating another user by email or username.
     The requesting user must have role='ADMIN' in their token payload.
+    Supports looking up target user from both User (external User Matrix) and LocalUser models.
     """
     def post(self, request):
         try:
@@ -280,17 +281,45 @@ class ImpersonateView(BaseAuthenticatedView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        target_email = request.data.get('email', '').strip().lower()
-        if not target_email:
-            return Response({"error": "email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        target_identifier = (request.data.get('email') or request.data.get('username') or '').strip()
+        if not target_identifier:
+            return Response({"error": "email or username is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate the target user exists and is active
-        target_user = User.objects.filter(email__iexact=target_email, status=1).first()
+        # Validate target user exists (check User first, then LocalUser)
+        target_user = User.objects.filter(email__iexact=target_identifier, status=1).first()
+        is_local_user = False
+        
+        if not target_user:
+            target_user = LocalUser.objects.filter(
+                Q(email__iexact=target_identifier) | Q(username__iexact=target_identifier)
+            ).first()
+            if target_user:
+                is_local_user = True
+
         if not target_user:
             return Response(
-                {"error": f"No active user found with email: {target_email}"},
+                {"error": f"No active user found with email/username: {target_identifier}"},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+        if is_local_user:
+            user_id = str(target_user.id)
+            user_email = target_user.email or target_user.username
+            user_username = target_user.username
+            user_name = target_user.fname or target_user.username
+            user_department = target_user.department
+            user_role = target_user.role
+            user_image = None
+            identifiers = list(filter(None, set([target_user.username, target_user.email])))
+        else:
+            user_id = str(target_user.id)
+            user_email = target_user.email
+            user_username = getattr(target_user, 'username', target_user.email) or target_user.email
+            user_name = target_user.name
+            user_department = target_user.department
+            user_role = target_user.role
+            user_image = target_user.image
+            identifiers = [target_user.email]
 
         jwt_secret = os.getenv('JWT_SECRET')
         jwt_algorithm = os.getenv('JWT_ALGORITHM')
@@ -298,27 +327,28 @@ class ImpersonateView(BaseAuthenticatedView):
 
         # Build module_access and module_roles for the target user
         module_access = {}
-        user_module_access = ModuleMatrix.objects.filter(email__iexact=target_email)
+        user_module_access = ModuleMatrix.objects.filter(email__in=identifiers)
         if user_module_access:
             module_access = {item.module: item.operator for item in user_module_access}
 
         user_module_roles = UserModuleRole.objects.filter(
-            user=target_user.email,
+            user__in=identifiers,
             module_code__is_active=True
         ).select_related('module_code')
 
         module_roles = {umr.module_code_id: umr.role for umr in user_module_roles}
 
-        title_matrix = TitleMatrix.objects.filter(user=target_user.email).first()
+        title_matrix = TitleMatrix.objects.filter(user__in=identifiers).first()
         title = title_matrix.title_id if title_matrix else None
 
         impersonate_payload = {
-            "user_id": str(target_user.id),
-            "email": target_user.email,
-            "name": target_user.name,
-            "department": target_user.department,
-            "role": target_user.role,
-            "image": target_user.image,
+            "user_id": user_id,
+            "email": user_email,
+            "username": user_username,
+            "name": user_name,
+            "department": user_department,
+            "role": user_role,
+            "image": user_image,
             "title": title,
             "module_access": module_access,
             "module_roles": module_roles,
@@ -330,18 +360,19 @@ class ImpersonateView(BaseAuthenticatedView):
         access_token = jwt.encode(impersonate_payload, jwt_secret, algorithm=jwt_algorithm)
 
         # Log impersonation (logged under target email, with impersonated_by in context)
-        log_login(request, target_email, 'impersonate', True,
+        log_login(request, user_email, 'impersonate', True,
                   f"Impersonated by {payload.get('email')}")
 
         return Response({
             "access_token": access_token,
             "user": {
-                "id": str(target_user.id),
-                "email": target_user.email,
-                "name": target_user.name,
-                "department": target_user.department,
-                "role": target_user.role,
-                "image": target_user.image,
+                "id": user_id,
+                "email": user_email,
+                "username": user_username,
+                "name": user_name,
+                "department": user_department,
+                "role": user_role,
+                "image": user_image,
                 "title": title,
             },
             "impersonated_by": payload.get('email'),
