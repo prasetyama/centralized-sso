@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
+from django.db.models import Q
 
 from sso_core.models import User, Module, ModuleMatrix, UserModuleRole, LocalUser, TitleMatrix
 import bcrypt
@@ -349,50 +350,59 @@ class ImpersonateView(BaseAuthenticatedView):
 class ManualLoginView(APIView):
     """
     Validates Manual Login Token, gets User, and issues JWT.
+    Supports authenticating via username or email.
     """
     def post(self, request):
-        username = request.data.get('username')
+        credential = request.data.get('username') or request.data.get('email')
         password = request.data.get('password')
 
-        if not username or not password:
-            return Response({"error": "username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not credential or not password:
+            return Response({"error": "username/email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        local_user = LocalUser.objects.filter(username__iexact=username).first()
+        local_user = LocalUser.objects.filter(
+            Q(username__iexact=credential) | Q(email__iexact=credential)
+        ).first()
         if not local_user:
-            log_login(request, username or 'unknown', 'manual', False, 'Invalid username')
+            log_login(request, credential or 'unknown', 'manual', False, 'Invalid username or email')
             return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
         
         if not bcrypt.checkpw(password.encode('utf-8'), local_user.password.encode('utf-8')):
-            log_login(request, username, 'manual', False, 'Invalid password')
+            log_login(request, credential, 'manual', False, 'Invalid password')
             return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
         
+        user_email = local_user.email or local_user.username
+
         # Get last login BEFORE recording current one
-        last_login = get_last_login(local_user.username)
+        last_login = get_last_login(user_email) or get_last_login(local_user.username)
 
         jwt_secret = os.getenv('JWT_SECRET')
         jwt_algorithm = os.getenv('JWT_ALGORITHM')
         access_token_lifetime = int(os.getenv('ACCESS_TOKEN_LIFETIME', '60'))
         
-        # Fetch module access from ModuleMatrix using local_user.username
+        # Gather possible user identifiers (both username and email) for matrix/role lookups
+        identifiers = list(filter(None, set([local_user.username, local_user.email])))
+
+        # Fetch module access from ModuleMatrix using user identifiers
         module_access = {}
-        user_module_access = ModuleMatrix.objects.filter(email=local_user.username)
+        user_module_access = ModuleMatrix.objects.filter(email__in=identifiers)
         if user_module_access:
             module_access = {item.module: item.operator for item in user_module_access}
 
-        # Fetch module roles from UserModuleRole using local_user.username
+        # Fetch module roles from UserModuleRole using user identifiers
         user_module_roles = UserModuleRole.objects.filter(
-            user=local_user.username,
+            user__in=identifiers,
             module_code__is_active=True
         ).select_related('module_code')
 
         module_roles = {umr.module_code_id: umr.role for umr in user_module_roles}
         
-        title_matrix = TitleMatrix.objects.filter(user=local_user.username).first()
+        title_matrix = TitleMatrix.objects.filter(user__in=identifiers).first()
         title = title_matrix.title_id if title_matrix else None
 
         payload = {
             "user_id": str(local_user.id),
-            "email": local_user.username,
+            "email": user_email,
+            "username": local_user.username,
             "name": local_user.fname,
             "department": local_user.department,
             "role": local_user.role,
@@ -408,7 +418,8 @@ class ManualLoginView(APIView):
         # Construct user_data directly to match UserSerializer fields
         user_data = {
             "id": str(local_user.id),
-            "email": local_user.username,
+            "email": user_email,
+            "username": local_user.username,
             "name": local_user.fname,
             "department": local_user.department,
             "role": local_user.role,
@@ -416,7 +427,7 @@ class ManualLoginView(APIView):
         }
 
         # Log successful login
-        log_login(request, local_user.username, 'manual', True)
+        log_login(request, user_email, 'manual', True)
         
         return Response({
             "access_token": access_token,
