@@ -70,3 +70,75 @@ export const impersonateUser = async (token: string, email: string) => {
         throw error;
     }
 }
+
+// ─── EORDERWEB User Management APIs ───────────────────────────────────────────
+
+export const fetchEOrderUsers = async (token: string, q?: string) => {
+    const response = await api.get('/eorder-users/', {
+        params: { q },
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const importEOrderUsersCsv = async (token: string, fileOrContent: File | string) => {
+    if (typeof fileOrContent === 'string') {
+        const response = await api.post('/eorder-users/import-csv/', { content: fileOrContent }, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        return response.data;
+    } else {
+        const formData = new FormData();
+        formData.append('file', fileOrContent);
+        const response = await api.post('/eorder-users/import-csv/', formData, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return response.data;
+    }
+};
+
+export const createEOrderUser = async (token: string, data: any) => {
+    const response = await api.post('/eorder-users/create/', data, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const updateEOrderUser = async (token: string, userId: number, data: any) => {
+    const response = await api.put(`/eorder-users/${userId}/`, data, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const deleteEOrderUser = async (token: string, userId: number) => {
+    const response = await api.delete(`/eorder-users/${userId}/`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const fetchEOrderDistributors = async (token: string, q?: string) => {
+    const response = await api.get('/eorder-users/distributors/', {
+        params: { q },
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const fetchEOrderImportLogs = async (token: string) => {
+    const response = await api.get('/eorder-users/logs/', {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const fetchEOrderImportLogDetail = async (token: string, filename: string) => {
+    const response = await api.get(`/eorder-users/logs/${filename}/`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};

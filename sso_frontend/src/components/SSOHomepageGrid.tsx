@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutGrid, ExternalLink, LogOut, ChevronDown,
   Shield, X, Loader2, AlertCircle, CheckCircle2,
-  User
+  User, Users
 } from 'lucide-react';
 import { impersonateUser } from '../api/api';
 
@@ -141,6 +142,7 @@ const ImpersonateModal = ({
 // ─── Header Dropdown ──────────────────────────────────────────────────────────
 const UserDropdown = ({ onImpersonate }: { onImpersonate: () => void }) => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
@@ -190,16 +192,26 @@ const UserDropdown = ({ onImpersonate }: { onImpersonate: () => void }) => {
             )}
           </div>
 
-          {/* Backdoor login — ADMIN only */}
+          {/* E-Order User Mgmt & Backdoor login — ADMIN only */}
           {isAdmin && (
-            <button
-              id="backdoor-login-btn"
-              onClick={() => { setOpen(false); onImpersonate(); }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-violet-700 hover:bg-violet-50 transition-colors font-medium cursor-pointer"
-            >
-              <Shield size={15} className="text-violet-500" />
-              Backdoor Login
-            </button>
+            <>
+              <button
+                id="eorder-user-mgmt-btn"
+                onClick={() => { setOpen(false); navigate('/eorder-users'); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-indigo-700 hover:bg-indigo-50 transition-colors font-medium cursor-pointer"
+              >
+                <Users size={15} className="text-indigo-500" />
+                E-Order User Mgmt
+              </button>
+              <button
+                id="backdoor-login-btn"
+                onClick={() => { setOpen(false); onImpersonate(); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-violet-700 hover:bg-violet-50 transition-colors font-medium cursor-pointer"
+              >
+                <Shield size={15} className="text-violet-500" />
+                Backdoor Login
+              </button>
+            </>
           )}
 
           {/* Divider */}

@@ -163,6 +163,8 @@ const LoginPage = () => {
   );
 };
 
+import { EOrderUserManagement } from './pages/EOrderUserManagement';
+
 function App() {
   // Use env variable or fallback
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -178,6 +180,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SSOHomepageGrid />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/eorder-users"
+              element={
+                <ProtectedRoute>
+                  <EOrderUserManagement />
                 </ProtectedRoute>
               }
             />

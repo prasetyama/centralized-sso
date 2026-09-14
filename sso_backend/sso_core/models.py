@@ -116,7 +116,10 @@ class LocalUser(models.Model):
     role = models.CharField(max_length=50, blank=True, null=True)
     fname = models.CharField(max_length=255, blank=True, null=True)
     department = models.CharField(max_length=255, blank=True, null=True)
-    region = models.CharField(max_length=255, blank=True, null=True)
+    region = models.CharField(max_length=100, blank=True, null=True)
+    employee_id = models.CharField(max_length=50, blank=True, null=True)
+    company_id = models.IntegerField(blank=True, null=True)
+    email = models.CharField(max_length=125, blank=True, null=True)
 
     class Meta:
         db_table = 'users'
@@ -124,6 +127,39 @@ class LocalUser(models.Model):
 
     def __str__(self):
         return f"{self.username}"
+
+
+class StdAreaMatrix(models.Model):
+    email = models.CharField(max_length=50, db_column='Email', blank=True, null=True)
+    zone = models.CharField(max_length=20, db_column='Zone', blank=True, null=True)
+    rd_desc = models.CharField(max_length=100, db_column='RD_DESC', blank=True, null=True)
+    operator = models.CharField(max_length=4, db_column='Operator', default='EQ')
+    shiptord = models.CharField(max_length=20, db_column='ShipToRD', blank=True, null=True)
+
+    class Meta:
+        db_table = 'std_area_matrix'
+        managed = False
+
+    def __str__(self):
+        return f"{self.email} - {self.shiptord}"
+
+
+class EorderDistributor(models.Model):
+    ship_to = models.CharField(max_length=10, db_column='Ship_To', blank=True, null=True)
+    sold_to = models.CharField(max_length=10, db_column='Sold_To', blank=True, null=True)
+    dist_name = models.CharField(max_length=50, db_column='DistName', blank=True, null=True)
+    alamat1 = models.CharField(max_length=100, db_column='Alamat1', blank=True, null=True)
+    alamat2 = models.CharField(max_length=100, db_column='Alamat2', blank=True, null=True)
+    alamat3 = models.CharField(max_length=100, db_column='Alamat3', blank=True, null=True)
+    dist_id = models.CharField(max_length=10, db_column='DistID', blank=True, null=True)
+    zone = models.CharField(max_length=50, db_column='Zone', blank=True, null=True)
+
+    class Meta:
+        db_table = 'eorder_eorder_distributor'
+        managed = False
+
+    def __str__(self):
+        return f"{self.dist_id} - {self.dist_name}"
 
 
 class LoginLog(models.Model):
