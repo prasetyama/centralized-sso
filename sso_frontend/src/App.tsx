@@ -164,6 +164,7 @@ const LoginPage = () => {
 };
 
 import { EOrderUserManagement } from './pages/EOrderUserManagement';
+import { ChangePasswordPage } from './pages/ChangePassword';
 
 function App() {
   // Use env variable or fallback
@@ -191,6 +192,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/change-password"
+              element={
+                <ProtectedRoute>
+                  <ChangePasswordPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/logout" element={<Logout />} />
           </Routes>
@@ -201,3 +210,4 @@ function App() {
 }
 
 export default App;
+

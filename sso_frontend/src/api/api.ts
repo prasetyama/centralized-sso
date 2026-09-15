@@ -142,3 +142,10 @@ export const fetchEOrderImportLogDetail = async (token: string, filename: string
     });
     return response.data;
 };
+
+export const changePassword = async (token: string, data: { old_password: string; new_password: string; confirm_password: string }) => {
+    const response = await api.post('/user/change-password/', data, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutGrid, ExternalLink, LogOut, ChevronDown,
   Shield, X, Loader2, AlertCircle, CheckCircle2,
-  User, Users
+  User, Users, KeyRound
 } from 'lucide-react';
 import { impersonateUser } from '../api/api';
 
@@ -214,6 +214,16 @@ const UserDropdown = ({ onImpersonate }: { onImpersonate: () => void }) => {
             </>
           )}
 
+          {/* Change Password for all users */}
+          <button
+            id="change-password-btn"
+            onClick={() => { setOpen(false); navigate('/change-password'); }}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium cursor-pointer"
+          >
+            <KeyRound size={15} className="text-indigo-500" />
+            Change Password
+          </button>
+
           {/* Divider */}
           <div className="border-t border-gray-100 my-1" />
 
@@ -228,6 +238,7 @@ const UserDropdown = ({ onImpersonate }: { onImpersonate: () => void }) => {
           </button>
         </div>
       )}
+
     </div>
   );
 };

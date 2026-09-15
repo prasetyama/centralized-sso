@@ -577,3 +577,75 @@ class UserDetailByIdView(BaseAuthenticatedView):
 
         return Response({"error": f"User with id '{target_id}' not found."}, status=status.HTTP_404_NOT_FOUND)
 
+
+class ChangePasswordView(BaseAuthenticatedView):
+    """
+    Endpoint for authenticated user to update their password.
+    Requires: old_password, new_password, confirm_password.
+    """
+    def post(self, request):
+        try:
+            payload = self.get_user_from_token(request)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+
+        if not old_password or not new_password or not confirm_password:
+            return Response(
+                {"error": "Semua field (password lama, password baru, dan konfirmasi password) wajib diisi."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if new_password != confirm_password:
+            return Response(
+                {"error": "Password baru dan konfirmasi password baru tidak cocok."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(new_password) < 6:
+            return Response(
+                {"error": "Password baru minimal 6 karakter."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        username = payload.get('username')
+        email = payload.get('email')
+        user_id = payload.get('user_id')
+
+        local_user = None
+        if username:
+            local_user = LocalUser.objects.filter(username__iexact=username).first()
+        if not local_user and email:
+            local_user = LocalUser.objects.filter(Q(email__iexact=email) | Q(username__iexact=email)).first()
+        if not local_user and user_id:
+            try:
+                local_user = LocalUser.objects.filter(id=int(user_id)).first()
+            except (ValueError, TypeError):
+                pass
+
+        if not local_user:
+            return Response(
+                {"error": "Akun pengguna lokal tidak ditemukan."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not bcrypt.checkpw(old_password.encode('utf-8'), local_user.password.encode('utf-8')):
+            return Response(
+                {"error": "Password lama tidak sesuai."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Hash and save new password
+        hashed_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        local_user.password = hashed_pw
+        local_user.save()
+
+        return Response(
+            {"message": "Password berhasil diperbarui."},
+            status=status.HTTP_200_OK
+        )
+
+
