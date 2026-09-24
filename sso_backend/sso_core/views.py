@@ -397,7 +397,7 @@ class ManualLoginView(APIView):
             log_login(request, credential or 'unknown', 'manual', False, 'Invalid username or email')
             return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
         
-        if not bcrypt.checkpw(password.encode('utf-8'), local_user.password.encode('utf-8')):
+        if not local_user.check_password(password):
             log_login(request, credential, 'manual', False, 'Invalid password')
             return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
         
@@ -632,15 +632,14 @@ class ChangePasswordView(BaseAuthenticatedView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        if not bcrypt.checkpw(old_password.encode('utf-8'), local_user.password.encode('utf-8')):
+        if not local_user.check_password(old_password):
             return Response(
                 {"error": "Password lama tidak sesuai."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         # Hash and save new password
-        hashed_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        local_user.password = hashed_pw
+        local_user.set_password(new_password)
         local_user.save()
 
         return Response(

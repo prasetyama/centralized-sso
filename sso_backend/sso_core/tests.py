@@ -62,3 +62,43 @@ class ManualLoginViewTestCase(TestCase):
             content_type="application/json"
         )
         self.assertEqual(response.status_code, 401)
+
+
+from sso_core.admin import LocalUserForm
+
+class LocalUserModelAndFormTestCase(TestCase):
+    def test_set_and_check_password(self):
+        user = LocalUser(username="testmodel")
+        user.set_password("mysecret123")
+        self.assertTrue(user.password.startswith("$2"))
+        self.assertTrue(user.check_password("mysecret123"))
+        self.assertFalse(user.check_password("wrongsecret"))
+
+    def test_local_user_form_create(self):
+        form_data = {
+            "username": "formuser",
+            "password": "formpassword123",
+            "role": "user"
+        }
+        form = LocalUserForm(data=form_data)
+        self.assertTrue(form.is_valid())
+        user = form.save(commit=False)
+        self.assertTrue(user.check_password("formpassword123"))
+
+    def test_local_user_form_update_without_password_change(self):
+        user = LocalUser(username="edituser")
+        user.set_password("oldpass123")
+        user.save()
+        old_hash = user.password
+
+        form_data = {
+            "username": "edituser",
+            "password": "",  # left blank
+            "role": "user"
+        }
+        form = LocalUserForm(data=form_data, instance=user)
+        self.assertTrue(form.is_valid())
+        updated_user = form.save(commit=False)
+        self.assertEqual(updated_user.password, old_hash)
+        self.assertTrue(updated_user.check_password("oldpass123"))
+

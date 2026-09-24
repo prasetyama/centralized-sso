@@ -1,3 +1,4 @@
+import bcrypt
 from django.db import models
 import uuid
 
@@ -127,6 +128,18 @@ class LocalUser(models.Model):
 
     def __str__(self):
         return f"{self.username}"
+
+    def set_password(self, raw_password):
+        if raw_password:
+            self.password = bcrypt.hashpw(raw_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+    def check_password(self, raw_password):
+        if not self.password or not raw_password:
+            return False
+        try:
+            return bcrypt.checkpw(raw_password.encode('utf-8'), self.password.encode('utf-8'))
+        except Exception:
+            return False
 
 
 class StdAreaMatrix(models.Model):

@@ -128,11 +128,50 @@ class UserModuleRoleAdmin(admin.ModelAdmin):
         return f"{obj.module_code.name} ({obj.module_code.code})"
     module_name.short_description = 'Module'
 
+class LocalUserForm(forms.ModelForm):
+    password = forms.CharField(
+        widget=forms.PasswordInput(render_value=False),
+        required=False,
+        help_text="Leave blank to keep existing password intact."
+    )
+
+    class Meta:
+        model = LocalUser
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance or not self.instance.pk:
+            self.fields['password'].required = True
+            self.fields['password'].help_text = "Required. Password will be hashed using bcrypt."
+
+    def clean_password(self):
+        password = self.cleaned_data.get('password')
+        if (not self.instance or not self.instance.pk) and not password:
+            raise forms.ValidationError("Password is required for new users.")
+        return password
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        password = self.cleaned_data.get('password')
+        if password:
+            user.set_password(password)
+        elif self.instance and self.instance.pk:
+            orig_user = LocalUser.objects.filter(pk=self.instance.pk).first()
+            if orig_user:
+                user.password = orig_user.password
+        if commit:
+            user.save()
+        return user
+
+
 @admin.register(LocalUser)
 class LocalUserAdmin(admin.ModelAdmin):
+    form = LocalUserForm
     list_display = ('username', 'fname', 'role', 'department')
     list_filter = ('role', 'department')
     search_fields = ('username', 'fname')
+
 
 
 # ─── Custom Admin View: Login Logs (file-based) ───────────────────────────────
