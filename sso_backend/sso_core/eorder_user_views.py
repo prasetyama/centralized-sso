@@ -142,7 +142,7 @@ class EOrderUserImportView(AdminOnlyAPIView):
         write_log(f"=== EORDER USER IMPORT LOG - {datetime.now().isoformat()} ===")
         write_log(f"Total lines received: {len(lines)}")
 
-        DEFAULT_PASS_PLAIN = "123456%qaz!"
+        DEFAULT_PASS_PLAIN = "nl.12345678"
         DEFAULT_PASS_HASH = bcrypt.hashpw(DEFAULT_PASS_PLAIN.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
         first_line = lines[0]
@@ -351,7 +351,7 @@ class EOrderUserDetailView(AdminOnlyAPIView):
         if not username or not email:
             return Response({"error": "username and email are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        DEFAULT_PASS_PLAIN = request.data.get('password') or "123456%qaz!"
+        DEFAULT_PASS_PLAIN = request.data.get('password') or "nl.12345678"
         DEFAULT_PASS_HASH = bcrypt.hashpw(DEFAULT_PASS_PLAIN.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
         if LocalUser.objects.filter(username__iexact=username).exists():
@@ -409,7 +409,7 @@ class EOrderUserDetailView(AdminOnlyAPIView):
             user.fname = new_fname
 
             if reset_password:
-                DEFAULT_PASS_HASH = bcrypt.hashpw("123456%qaz!".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                DEFAULT_PASS_HASH = bcrypt.hashpw("nl.12345678".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                 user.password = DEFAULT_PASS_HASH
 
             user.save()
