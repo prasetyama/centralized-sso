@@ -123,6 +123,14 @@ export const EOrderUserManagement = () => {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
+    useEffect(() => {
+        if (!showUserModal) return;
+        const timer = setTimeout(() => {
+            loadDistributors(distSearch);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [distSearch, showUserModal]);
+
     // Handle CSV parse preview
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -197,7 +205,8 @@ export const EOrderUserManagement = () => {
             reset_password: false,
             selected_ship_tos: userItem.mapped_areas ? userItem.mapped_areas.map((a: any) => a.shiptord).filter(Boolean) : []
         });
-        loadDistributors();
+        setDistSearch('');
+        loadDistributors('');
         setShowUserModal(true);
     };
 
@@ -211,7 +220,8 @@ export const EOrderUserManagement = () => {
             reset_password: false,
             selected_ship_tos: []
         });
-        loadDistributors();
+        setDistSearch('');
+        loadDistributors('');
         setShowUserModal(true);
     };
 
@@ -779,19 +789,17 @@ export const EOrderUserManagement = () => {
                                     type="text"
                                     placeholder="Search distributor name or ship-to..."
                                     value={distSearch}
-                                    onChange={(e) => {
-                                        setDistSearch(e.target.value);
-                                        loadDistributors(e.target.value);
-                                    }}
+                                    onChange={(e) => setDistSearch(e.target.value)}
                                     className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs"
                                 />
 
                                 <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-xl bg-gray-50/50 p-2 space-y-1">
-                                    {distributorOptions.map((dist) => {
+                                    {distributorOptions.map((dist, idx) => {
                                         const shipToVal = dist.ship_to || dist.dist_id;
                                         const isChecked = formData.selected_ship_tos.includes(shipToVal);
+                                        const itemKey = dist.ship_to ? `${dist.dist_id}_${dist.ship_to}` : `${dist.dist_id}_${idx}`;
                                         return (
-                                            <label key={dist.dist_id} className="flex items-center p-1.5 hover:bg-white rounded-lg cursor-pointer transition-colors text-xs">
+                                            <label key={itemKey} className="flex items-center p-1.5 hover:bg-white rounded-lg cursor-pointer transition-colors text-xs">
                                                 <input
                                                     type="checkbox"
                                                     checked={isChecked}

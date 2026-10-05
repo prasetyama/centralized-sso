@@ -166,6 +166,7 @@ class EorderDistributor(models.Model):
     alamat3 = models.CharField(max_length=100, db_column='Alamat3', blank=True, null=True)
     dist_id = models.CharField(max_length=10, db_column='DistID', blank=True, null=True)
     zone = models.CharField(max_length=50, db_column='Zone', blank=True, null=True)
+    flag = models.CharField(max_length=1, db_column='Flag', blank=True, null=True)
 
     class Meta:
         db_table = 'eorder_eorder_distributor'

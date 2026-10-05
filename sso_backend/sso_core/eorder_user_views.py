@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 
 from sso_core.models import LocalUser, ModuleMatrix, UserModuleRole, StdAreaMatrix, EorderDistributor, Module
 from sso_core.views import BaseAuthenticatedView
@@ -482,9 +483,11 @@ class EOrderUserDistributorsView(AdminOnlyAPIView):
             return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
         q = request.query_params.get('q', '').strip()
-        qs = EorderDistributor.objects.all()
+        qs = EorderDistributor.objects.filter(flag='1')
         if q:
-            qs = qs.filter(dist_name__icontains=q) | qs.filter(dist_id__icontains=q) | qs.filter(ship_to__icontains=q)
+            qs = qs.filter(
+                Q(dist_name__icontains=q) | Q(dist_id__icontains=q) | Q(ship_to__icontains=q)
+            )
 
         distributors = []
         for d in qs.order_by('dist_name')[:100]:
