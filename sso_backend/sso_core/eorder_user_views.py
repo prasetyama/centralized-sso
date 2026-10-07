@@ -12,7 +12,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from sso_core.models import LocalUser, ModuleMatrix, UserModuleRole, StdAreaMatrix, EorderDistributor, Module
-from sso_core.views import BaseAuthenticatedView
+from sso_core.views import BaseAuthenticatedView, get_last_login_map
 
 # Setup Log Directory
 LOG_DIR = Path(settings.BASE_DIR) / 'logs'
@@ -38,7 +38,7 @@ class AdminOnlyAPIView(BaseAuthenticatedView):
 
 class EOrderUserListView(AdminOnlyAPIView):
     """
-    GET: List users with role = 'user_eorder' (or all EORDER users) along with mapped std_area_matrix details.
+    GET: List users with role = 'user_eorder' (or all EORDER users) along with mapped std_area_matrix details and last_login.
     """
     def get(self, request):
         try:
@@ -63,8 +63,20 @@ class EOrderUserListView(AdminOnlyAPIView):
         if request.query_params.get('all_roles') != 'true':
             users_qs = users_qs.filter(role='user_eorder')
 
+        users_list = list(users_qs.order_by('-id')[:200])
+
+        # Batch fetch last_login timestamps for all users in the list
+        all_identifiers = []
+        for u in users_list:
+            if u.email:
+                all_identifiers.append(u.email)
+            if u.username:
+                all_identifiers.append(u.username)
+        
+        last_login_map = get_last_login_map(all_identifiers)
+
         result_list = []
-        for u in users_qs.order_by('-id')[:200]:
+        for u in users_list:
             mapped_areas_qs = StdAreaMatrix.objects.filter(email__iexact=u.email) if u.email else StdAreaMatrix.objects.none()
             if not mapped_areas_qs.exists() and u.username:
                 mapped_areas_qs = StdAreaMatrix.objects.filter(email__iexact=u.username)
@@ -88,6 +100,12 @@ class EOrderUserListView(AdminOnlyAPIView):
                     "dist_name": dist_obj.dist_name if dist_obj else None
                 })
 
+            user_last_login = None
+            if u.email and u.email.lower() in last_login_map:
+                user_last_login = last_login_map[u.email.lower()]
+            elif u.username and u.username.lower() in last_login_map:
+                user_last_login = last_login_map[u.username.lower()]
+
             result_list.append({
                 "id": u.id,
                 "username": u.username,
@@ -98,6 +116,7 @@ class EOrderUserListView(AdminOnlyAPIView):
                 "region": u.region,
                 "employee_id": u.employee_id,
                 "company_id": u.company_id,
+                "last_login": user_last_login,
                 "mapped_areas": areas_list
             })
 

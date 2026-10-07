@@ -452,6 +452,7 @@ export const EOrderUserManagement = () => {
                                                 <th className="py-3.5 px-4">Distributor Name</th>
                                                 <th className="py-3.5 px-4">Primary Email</th>
                                                 <th className="py-3.5 px-4">Mapped Ship-To Areas</th>
+                                                <th className="py-3.5 px-4">Last Login</th>
                                                 <th className="py-3.5 px-4 text-right">Actions</th>
                                             </tr>
                                         </thead>
@@ -483,6 +484,9 @@ export const EOrderUserManagement = () => {
                                                         ) : (
                                                             <span className="text-xs text-gray-400 italic">No distributor areas</span>
                                                         )}
+                                                    </td>
+                                                    <td className="py-3.5 px-4">
+                                                        {u.last_login ? new Date(u.last_login).toLocaleString() : '-'}
                                                     </td>
                                                     <td className="py-3.5 text-right space-x-2">
                                                         <button

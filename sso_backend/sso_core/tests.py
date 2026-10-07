@@ -102,3 +102,62 @@ class LocalUserModelAndFormTestCase(TestCase):
         self.assertEqual(updated_user.password, old_hash)
         self.assertTrue(updated_user.check_password("oldpass123"))
 
+
+from sso_core.models import LoginLog
+from sso_core.views import get_last_login, get_last_login_map, log_login
+
+class LastLoginTestCase(TestCase):
+    def test_last_login_property_and_map(self):
+        user = LocalUser(username="testlastlogin", email="lastlogin@example.com")
+        self.assertIsNone(user.last_login)
+
+        # Log a successful login attempt
+        log_login(None, "lastlogin@example.com", "manual", True)
+
+        # Check property & helper functions
+        last_login_ts = get_last_login("lastlogin@example.com")
+        self.assertIsNotNone(last_login_ts)
+
+        mapping = get_last_login_map(["lastlogin@example.com", "nonexistent@example.com"])
+        self.assertIn("lastlogin@example.com", mapping)
+        self.assertNotIn("nonexistent@example.com", mapping)
+        self.assertEqual(user.last_login, last_login_ts)
+
+    def test_admin_last_login_display(self):
+        from sso_core.admin import LocalUserAdmin
+        local_user_admin = LocalUserAdmin(LocalUser, None)
+        user = LocalUser(username="testadmindisplay")
+        
+        # Test display when last_login is None (must not raise TypeError)
+        res_empty = local_user_admin.last_login_display(user)
+        self.assertIn("Belum Login", str(res_empty))
+
+        # Test display when user has logged in
+        log_login(None, "testadmindisplay", "manual", True)
+        res_logged = local_user_admin.last_login_display(user)
+        self.assertIn("color: #16a34a", str(res_logged))
+
+    def test_has_logged_in_filter(self):
+        from sso_core.admin import HasLoggedInFilter, LocalUserAdmin
+        from django.test import RequestFactory
+
+        factory = RequestFactory()
+        user_never = LocalUser.objects.create(username="neveruser", email="never@example.com")
+        user_logged = LocalUser.objects.create(username="loggeduser", email="logged@example.com")
+
+        log_login(None, "loggeduser", "manual", True)
+
+        req_logged = factory.get('/admin/sso_core/localuser/', {'has_logged_in': 'logged_in'})
+        filter_logged = HasLoggedInFilter(req_logged, req_logged.GET.copy(), LocalUser, LocalUserAdmin)
+        qs_logged = filter_logged.queryset(req_logged, LocalUser.objects.all())
+
+        req_never = factory.get('/admin/sso_core/localuser/', {'has_logged_in': 'never'})
+        filter_never = HasLoggedInFilter(req_never, req_never.GET.copy(), LocalUser, LocalUserAdmin)
+        qs_never = filter_never.queryset(req_never, LocalUser.objects.all())
+
+        self.assertIn(user_logged, list(qs_logged))
+        self.assertNotIn(user_never, list(qs_logged))
+
+        self.assertIn(user_never, list(qs_never))
+        self.assertNotIn(user_logged, list(qs_never))
+

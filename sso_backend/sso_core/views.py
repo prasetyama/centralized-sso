@@ -13,7 +13,8 @@ from rest_framework import status
 from django.conf import settings
 from django.db.models import Q
 
-from sso_core.models import User, Module, ModuleMatrix, UserModuleRole, LocalUser, TitleMatrix
+from django.db.models import Max
+from sso_core.models import User, Module, ModuleMatrix, UserModuleRole, LocalUser, TitleMatrix, LoginLog
 import bcrypt
 from sso_core.serializers import UserSerializer, ModuleMatrixSerializer, GoogleLoginSerializer
 
@@ -47,18 +48,37 @@ def get_client_ip(request):
 
 
 def log_login(request, email, method, success, error_message=None):
-    """Record a login attempt to the JSONL log file."""
+    """Record a login attempt to both JSONL log file AND LoginLog database table."""
     try:
+        user_agent = (request.META.get('HTTP_USER_AGENT', '') or '')[:500]
+        ip_addr = get_client_ip(request)
+        status_str = 'success' if success else 'failed'
+        clean_email = email or 'unknown'
+
+        # 1. Log to JSONL audit file
         entry = {
             'timestamp': datetime.utcnow().isoformat() + 'Z',
-            'email': email or 'unknown',
+            'email': clean_email,
             'method': method,
-            'status': 'success' if success else 'failed',
-            'ip_address': get_client_ip(request),
-            'user_agent': (request.META.get('HTTP_USER_AGENT', '') or '')[:500],
+            'status': status_str,
+            'ip_address': ip_addr,
+            'user_agent': user_agent,
             'error': error_message,
         }
         _login_logger.info(json.dumps(entry, ensure_ascii=False))
+
+        # 2. Log to LoginLog DB model for fast ORM aggregation
+        try:
+            LoginLog.objects.create(
+                email=clean_email,
+                login_method=method,
+                status=status_str,
+                ip_address=ip_addr,
+                user_agent=user_agent,
+                error_message=error_message,
+            )
+        except Exception:
+            pass
     except Exception:
         pass  # Logging should never break the login flow
 
@@ -91,12 +111,61 @@ def _read_login_logs(email=None, limit=None):
 
 
 def get_last_login(email):
-    """Get the most recent successful login timestamp for a user."""
+    """Get the most recent successful login timestamp for a user (DB first, JSONL fallback)."""
+    if not email:
+        return None
+    try:
+        log_obj = LoginLog.objects.filter(
+            email__iexact=email,
+            status='success'
+        ).order_by('-created_at').first()
+        if log_obj:
+            return log_obj.created_at.isoformat()
+    except Exception:
+        pass
+
     logs = _read_login_logs(email=email)
     for log in logs:
         if log.get('status') == 'success':
             return log.get('timestamp')
     return None
+
+
+def get_last_login_map(identifiers=None):
+    """
+    Returns a dict mapping lowercase email/username -> last successful login timestamp (ISO string).
+    Efficiently queries LoginLog DB with fallback to JSONL file.
+    """
+    mapping = {}
+    if not identifiers:
+        return mapping
+
+    clean_ids = [str(x).strip().lower() for x in identifiers if x]
+    if not clean_ids:
+        return mapping
+
+    try:
+        logs_qs = (
+            LoginLog.objects.filter(status='success', email__in=clean_ids)
+            .values('email')
+            .annotate(last_login=Max('created_at'))
+        )
+        for row in logs_qs:
+            if row['last_login']:
+                mapping[row['email'].lower()] = row['last_login'].isoformat()
+    except Exception:
+        pass
+
+    # Check for missing identifiers in JSONL file log fallback
+    missing = [x for x in clean_ids if x not in mapping]
+    if missing:
+        all_logs = _read_login_logs()
+        for log in all_logs:
+            if log.get('status') == 'success':
+                em = (log.get('email') or '').strip().lower()
+                if em in missing and em not in mapping:
+                    mapping[em] = log.get('timestamp')
+    return mapping
 
 
 class BaseAuthenticatedView(APIView):
@@ -528,6 +597,7 @@ class UserDetailByIdView(BaseAuthenticatedView):
                     "department": u.department,
                     "region": u.region,
                     "role": u.role,
+                    "last_login": u.last_login,
                 }
 
             # Check remaining missing IDs in User matrix
@@ -542,6 +612,7 @@ class UserDetailByIdView(BaseAuthenticatedView):
                         "department": mu.department,
                         "region": None,
                         "role": mu.role,
+                        "last_login": mu.last_login,
                     }
 
             return Response({"users": users_map}, status=status.HTTP_200_OK)
@@ -561,6 +632,7 @@ class UserDetailByIdView(BaseAuthenticatedView):
                 "department": local_user.department,
                 "region": local_user.region,
                 "role": local_user.role,
+                "last_login": local_user.last_login,
             }, status=status.HTTP_200_OK)
 
         # Secondary lookup: User (table User Matrix)
@@ -573,6 +645,7 @@ class UserDetailByIdView(BaseAuthenticatedView):
                 "department": matrix_user.department,
                 "region": None,
                 "role": matrix_user.role,
+                "last_login": matrix_user.last_login,
             }, status=status.HTTP_200_OK)
 
         return Response({"error": f"User with id '{target_id}' not found."}, status=status.HTTP_404_NOT_FOUND)

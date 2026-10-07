@@ -2,14 +2,92 @@ from django import forms
 from django.contrib import admin
 from django.template.response import TemplateResponse
 from django.urls import path
-from .models import User, Module, UserModuleRole, ModuleMatrix, Role, TitleMatrix, LocalUser
+from django.utils.html import format_html
+from django.utils.dateparse import parse_datetime
+from django.db.models import Q
+from .models import User, Module, UserModuleRole, ModuleMatrix, Role, TitleMatrix, LocalUser, LoginLog
+
+
+class HasLoggedInFilter(admin.SimpleListFilter):
+    title = 'Status Login'
+    parameter_name = 'has_logged_in'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('logged_in', 'Sudah Login'),
+            ('never', 'Belum Pernah Login'),
+        )
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if not val:
+            return queryset
+        
+        clean_ids = set()
+        # 1. Fetch from LoginLog DB table (if table exists)
+        try:
+            db_emails = LoginLog.objects.filter(status='success').values_list('email', flat=True).distinct()
+            for e in db_emails:
+                if e and str(e).strip() and str(e).strip().lower() != 'unknown':
+                    s = str(e).strip()
+                    clean_ids.add(s)
+                    clean_ids.add(s.lower())
+                    clean_ids.add(s.upper())
+        except Exception:
+            pass
+
+        # 2. Fetch from JSONL file logs (independent try block)
+        try:
+            all_file_logs = _read_all_logs()
+            for log in all_file_logs:
+                if log.get('status') == 'success' and log.get('email'):
+                    s = str(log['email']).strip()
+                    if s and s.lower() != 'unknown':
+                        clean_ids.add(s)
+                        clean_ids.add(s.lower())
+                        clean_ids.add(s.upper())
+        except Exception:
+            pass
+
+        if not clean_ids:
+            if val == 'logged_in':
+                return queryset.none()
+            return queryset
+
+        is_user_matrix = (queryset.model.__name__ == 'User')
+
+        if val == 'logged_in':
+            if is_user_matrix:
+                return queryset.filter(email__in=clean_ids).distinct()
+            else:
+                return queryset.filter(Q(email__in=clean_ids) | Q(username__in=clean_ids)).distinct()
+        elif val == 'never':
+            if is_user_matrix:
+                return queryset.exclude(email__in=clean_ids).distinct()
+            else:
+                return queryset.exclude(Q(email__in=clean_ids) | Q(username__in=clean_ids)).distinct()
+
+        return queryset
+
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('email', 'name', 'department', 'role', 'status')
-    list_filter = ('status',)
+    list_display = ('email', 'name', 'department', 'role', 'status', 'last_login_display')
+    list_filter = ('status', HasLoggedInFilter)
     search_fields = ('email', 'name', 'department', 'role', 'status')
     ordering = ('email',)
+
+    def last_login_display(self, obj):
+        val = obj.last_login
+        if not val:
+            return format_html('<span style="color: #dc2626; font-weight: bold; background-color: #fee2e2; padding: 2px 8px; border-radius: 4px;">{}</span>', 'Belum Login')
+        try:
+            dt = parse_datetime(val) if isinstance(val, str) else val
+            formatted = dt.strftime('%Y-%m-%d %H:%M') if dt else val
+            return format_html('<span style="color: #16a34a; font-weight: 600;">{}</span>', formatted)
+        except Exception:
+            return val
+    last_login_display.short_description = 'Last Login'
 
 @admin.register(Module)
 class ModuleAdmin(admin.ModelAdmin):
@@ -168,9 +246,21 @@ class LocalUserForm(forms.ModelForm):
 @admin.register(LocalUser)
 class LocalUserAdmin(admin.ModelAdmin):
     form = LocalUserForm
-    list_display = ('username', 'fname', 'role', 'department')
-    list_filter = ('role', 'department')
+    list_display = ('username', 'fname', 'role', 'department', 'last_login_display')
+    list_filter = ('role', 'department', HasLoggedInFilter)
     search_fields = ('username', 'fname')
+
+    def last_login_display(self, obj):
+        val = obj.last_login
+        if not val:
+            return format_html('<span style="color: #dc2626; font-weight: bold; background-color: #fee2e2; padding: 2px 8px; border-radius: 4px;">{}</span>', 'Belum Login')
+        try:
+            dt = parse_datetime(val) if isinstance(val, str) else val
+            formatted = dt.strftime('%Y-%m-%d %H:%M') if dt else val
+            return format_html('<span style="color: #16a34a; font-weight: 600;">{}</span>', formatted)
+        except Exception:
+            return val
+    last_login_display.short_description = 'Last Login'
 
 
 

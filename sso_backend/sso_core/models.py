@@ -45,6 +45,11 @@ class User(ITamModule):
     def __str__(self):
         return f"{self.email}"
 
+    @property
+    def last_login(self):
+        from sso_core.views import get_last_login
+        return get_last_login(self.email)
+
 class UserModuleRole(ITamModule):
     ROLE_VIEWER = 'viewer'
     ROLE_EDITOR = 'editor'
@@ -140,6 +145,11 @@ class LocalUser(models.Model):
             return bcrypt.checkpw(raw_password.encode('utf-8'), self.password.encode('utf-8'))
         except Exception:
             return False
+
+    @property
+    def last_login(self):
+        from sso_core.views import get_last_login
+        return get_last_login(self.email) or get_last_login(self.username)
 
 
 class StdAreaMatrix(models.Model):

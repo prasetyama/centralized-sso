@@ -2,10 +2,12 @@ from rest_framework import serializers
 from .models import User, Module, ModuleMatrix, UserModuleRole
 
 class UserSerializer(serializers.ModelSerializer):
+    last_login = serializers.ReadOnlyField()
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'name', 'department', 'role', 'image']
-        read_only_fields = ['id']
+        fields = ['id', 'email', 'name', 'department', 'role', 'image', 'last_login']
+        read_only_fields = ['id', 'last_login']
 
 class ModuleMatrixSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
