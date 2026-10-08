@@ -553,3 +553,147 @@ class EOrderImportLogsView(AdminOnlyAPIView):
 
         log_files.sort(key=lambda x: x['created_at'], reverse=True)
         return Response({"logs": log_files}, status=status.HTTP_200_OK)
+
+
+class EOrderUserExportView(AdminOnlyAPIView):
+    """
+    GET: Export EORDERWEB users list to Excel (.xlsx) file with mapped ship-to areas and last login timestamps.
+    """
+    def get(self, request):
+        try:
+            self.check_admin(request)
+        except PermissionError as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        query = request.query_params.get('q', '').strip()
+
+        users_qs = LocalUser.objects.all()
+        if query:
+            users_qs = users_qs.filter(
+                Q(username__icontains=query) | Q(email__icontains=query) | Q(fname__icontains=query)
+            )
+
+        if request.query_params.get('all_roles') != 'true':
+            users_qs = users_qs.filter(role='user_eorder')
+
+        users_list = list(users_qs.order_by('-id'))
+
+        # Batch fetch last_login timestamps
+        all_identifiers = []
+        for u in users_list:
+            if u.email:
+                all_identifiers.append(u.email)
+            if u.username:
+                all_identifiers.append(u.username)
+
+        last_login_map = get_last_login_map(all_identifiers)
+
+        import openpyxl
+        from openpyxl.utils import get_column_letter
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from django.http import HttpResponse
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "E-Order Users"
+
+        # Headers
+        headers = [
+            "No",
+            "Username",
+            "Nama Distributor",
+            "Email Primary",
+            "Ship-To Code / Areas",
+            "Distributor Details",
+            "Last Login",
+            "Role",
+            "Department",
+            "Region"
+        ]
+
+        header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4F46E5", end_color="4F46E5", fill_type="solid")
+        alignment_center = Alignment(horizontal="center", vertical="center")
+        thin_border = Border(
+            left=Side(style='thin', color='E5E7EB'),
+            right=Side(style='thin', color='E5E7EB'),
+            top=Side(style='thin', color='E5E7EB'),
+            bottom=Side(style='thin', color='E5E7EB')
+        )
+
+        ws.append(headers)
+        for col_num in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = alignment_center
+
+        for idx, u in enumerate(users_list, 1):
+            mapped_areas_qs = StdAreaMatrix.objects.filter(email__iexact=u.email) if u.email else StdAreaMatrix.objects.none()
+            if not mapped_areas_qs.exists() and u.username:
+                mapped_areas_qs = StdAreaMatrix.objects.filter(email__iexact=u.username)
+
+            ship_tos = []
+            dist_details = []
+            for area in mapped_areas_qs:
+                dist_obj = None
+                if area.shiptord:
+                    dist_obj = EorderDistributor.objects.filter(ship_to=area.shiptord).first()
+                    if not dist_obj:
+                        dist_obj = EorderDistributor.objects.filter(dist_id=area.shiptord).first()
+
+                shipto_str = f"{area.shiptord} ({area.zone})" if area.zone else (area.shiptord or "-")
+                ship_tos.append(shipto_str)
+
+                detail_str = f"{area.shiptord}: {area.rd_desc or (dist_obj.dist_name if dist_obj else '-')}"
+                dist_details.append(detail_str)
+
+            user_last_login = "-"
+            raw_last_login = None
+            if u.email and u.email.lower() in last_login_map:
+                raw_last_login = last_login_map[u.email.lower()]
+            elif u.username and u.username.lower() in last_login_map:
+                raw_last_login = last_login_map[u.username.lower()]
+
+            if raw_last_login:
+                try:
+                    dt = datetime.fromisoformat(raw_last_login.replace('Z', '+00:00'))
+                    user_last_login = dt.strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    user_last_login = str(raw_last_login)
+
+            row = [
+                idx,
+                u.username or "-",
+                u.fname or "-",
+                u.email or "-",
+                ", ".join(ship_tos) if ship_tos else "-",
+                "; ".join(dist_details) if dist_details else "-",
+                user_last_login,
+                u.role or "-",
+                u.department or "-",
+                u.region or "-"
+            ]
+            ws.append(row)
+
+        for row in ws.iter_rows(min_row=1, max_row=len(users_list) + 1, min_col=1, max_col=len(headers)):
+            for cell in row:
+                cell.border = thin_border
+                if cell.row > 1 and cell.column in [1, 7]:
+                    cell.alignment = alignment_center
+
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"eorder_users_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
+

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     fetchEOrderUsers,
+    exportEOrderUsersExcel,
     importEOrderUsersCsv,
     createEOrderUser,
     updateEOrderUser,
@@ -27,7 +28,8 @@ import {
     X,
     Key,
     RefreshCw,
-    Eye
+    Eye,
+    Download
 } from 'lucide-react';
 
 export const EOrderUserManagement = () => {
@@ -69,6 +71,51 @@ export const EOrderUserManagement = () => {
 
     // Modal state (Delete User)
     const [deletingUser, setDeletingUser] = useState<any | null>(null);
+
+    // Excel Export State
+    const [exporting, setExporting] = useState(false);
+
+    const handleExportExcel = async () => {
+        if (!token) return;
+        setExporting(true);
+        setErrorMsg(null);
+        try {
+            const blobData = await exportEOrderUsersExcel(token, searchQuery);
+            const url = window.URL.createObjectURL(new Blob([blobData]));
+            const link = document.createElement('a');
+            link.href = url;
+            const nowStr = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+            link.setAttribute('download', `eorder_users_${nowStr}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err: any) {
+            console.error("Backend export error, falling back to client XLSX generation", err);
+            try {
+                const XLSX = await import('xlsx');
+                const dataToExport = usersList.map((u, idx) => ({
+                    'No': idx + 1,
+                    'Username': u.username || '-',
+                    'Nama Distributor': u.fname || '-',
+                    'Email Primary': u.email || '-',
+                    'Mapped Ship-To Areas': u.mapped_areas ? u.mapped_areas.map((a: any) => `${a.shiptord} (${a.zone || '-'})`).join(', ') : '-',
+                    'Last Login': u.last_login ? new Date(u.last_login).toLocaleString() : '-',
+                    'Role': u.role || '-',
+                    'Department': u.department || '-',
+                    'Region': u.region || '-'
+                }));
+                const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "E-Order Users");
+                XLSX.writeFile(workbook, `eorder_users_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            } catch (exportErr) {
+                setErrorMsg('Failed to export Excel file.');
+            }
+        } finally {
+            setExporting(false);
+        }
+    };
 
     // Load user list
     const loadUsers = async () => {
@@ -419,6 +466,19 @@ export const EOrderUserManagement = () => {
                                     title="Refresh Data"
                                 >
                                     <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+                                </button>
+                                <button
+                                    onClick={handleExportExcel}
+                                    disabled={exporting}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-medium rounded-xl text-sm flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+                                    title="Export E-Order Users to Excel"
+                                >
+                                    {exporting ? (
+                                        <Loader2 size={18} className="animate-spin" />
+                                    ) : (
+                                        <Download size={18} />
+                                    )}
+                                    Export Excel
                                 </button>
                                 <button
                                     onClick={handleOpenCreate}

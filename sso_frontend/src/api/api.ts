@@ -81,6 +81,16 @@ export const fetchEOrderUsers = async (token: string, q?: string) => {
     return response.data;
 };
 
+export const exportEOrderUsersExcel = async (token: string, q?: string) => {
+    const response = await api.get('/eorder-users/export-excel/', {
+        params: { q },
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+    });
+    return response.data;
+};
+
+
 export const importEOrderUsersCsv = async (token: string, fileOrContent: File | string) => {
     if (typeof fileOrContent === 'string') {
         const response = await api.post('/eorder-users/import-csv/', { content: fileOrContent }, {
