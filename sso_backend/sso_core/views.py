@@ -289,7 +289,7 @@ class UserModulesView(BaseAuthenticatedView):
             
             # Retrieve modules the user has access to based on UserModuleRole mapping
             modules = ModuleMatrix.objects.filter(
-                email=payload.get('email')
+                Q(email=payload.get('email')) | Q(email=payload.get('username'))
             ).exclude(module__in=["STC", "STD", "STD FS", "STT NL", "STT NL FS", "STT RD", "STT RD FS", "STT SD", "STT SD FS"])
             
             serializer = ModuleMatrixSerializer(modules, many=True)
