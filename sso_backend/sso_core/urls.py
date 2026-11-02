@@ -6,7 +6,8 @@ from sso_core.eorder_user_views import (
     EOrderUserDetailView,
     EOrderUserDistributorsView,
     EOrderImportLogsView,
-    EOrderUserExportView
+    EOrderUserExportView,
+    EOrderUserStatsView
 )
 
 urlpatterns = [
@@ -23,6 +24,7 @@ urlpatterns = [
     # EORDERWEB User Management Routes
     path('eorder-users/', EOrderUserListView.as_view(), name='eorder-user-list'),
     path('eorder-users/export-excel/', EOrderUserExportView.as_view(), name='eorder-user-export-excel'),
+    path('eorder-users/stats/', EOrderUserStatsView.as_view(), name='eorder-user-stats'),
     path('eorder-users/import-csv/', EOrderUserImportView.as_view(), name='eorder-user-import-csv'),
     path('eorder-users/create/', EOrderUserDetailView.as_view(), name='eorder-user-create'),
     path('eorder-users/<int:user_id>/', EOrderUserDetailView.as_view(), name='eorder-user-detail'),

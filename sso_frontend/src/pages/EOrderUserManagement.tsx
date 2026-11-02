@@ -12,6 +12,8 @@ import {
     fetchEOrderImportLogs,
     fetchEOrderImportLogDetail
 } from '../api/api';
+import type { EOrderUserSort } from '../api/api';
+import { EOrderSubmissionStats } from '../components/EOrderSubmissionStats';
 import {
     Users,
     Upload,
@@ -29,7 +31,10 @@ import {
     Key,
     RefreshCw,
     Eye,
-    Download
+    Download,
+    ArrowUp,
+    ArrowDown,
+    ArrowUpDown
 } from 'lucide-react';
 
 export const EOrderUserManagement = () => {
@@ -44,6 +49,7 @@ export const EOrderUserManagement = () => {
     const [usersList, setUsersList] = useState<any[]>([]);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
+    const [sortLastLogin, setSortLastLogin] = useState<EOrderUserSort>('');
 
     // CSV Upload state
     const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -80,7 +86,7 @@ export const EOrderUserManagement = () => {
         setExporting(true);
         setErrorMsg(null);
         try {
-            const blobData = await exportEOrderUsersExcel(token, searchQuery);
+            const blobData = await exportEOrderUsersExcel(token, searchQuery, sortLastLogin);
             const url = window.URL.createObjectURL(new Blob([blobData]));
             const link = document.createElement('a');
             link.href = url;
@@ -123,7 +129,7 @@ export const EOrderUserManagement = () => {
         setLoading(true);
         setErrorMsg(null);
         try {
-            const data = await fetchEOrderUsers(token, searchQuery);
+            const data = await fetchEOrderUsers(token, searchQuery, sortLastLogin);
             setUsersList(data.users || []);
         } catch (err: any) {
             setErrorMsg(err.response?.data?.error || 'Failed to load users list.');
@@ -168,7 +174,13 @@ export const EOrderUserManagement = () => {
             }
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, sortLastLogin]);
+
+    const cycleLastLoginSort = () => {
+        setSortLastLogin((prev) =>
+            prev === '' ? 'last_login_desc' : prev === 'last_login_desc' ? 'last_login_asc' : ''
+        );
+    };
 
     useEffect(() => {
         if (!showUserModal) return;
@@ -446,6 +458,7 @@ export const EOrderUserManagement = () => {
                 {/* --- TAB 1: USER LIST --- */}
                 {activeTab === 'users' && (
                     <div className="space-y-6">
+                        <EOrderSubmissionStats token={token} />
                         {/* Search & Actions Bar */}
                         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row gap-4 items-center justify-between">
                             <div className="relative w-full sm:w-80">
@@ -512,7 +525,26 @@ export const EOrderUserManagement = () => {
                                                 <th className="py-3.5 px-4">Distributor Name</th>
                                                 <th className="py-3.5 px-4">Primary Email</th>
                                                 <th className="py-3.5 px-4">Mapped Ship-To Areas</th>
-                                                <th className="py-3.5 px-4">Last Login</th>
+                                                <th
+                                                    className="py-3.5 px-4"
+                                                    aria-sort={sortLastLogin === 'last_login_desc' ? 'descending' : sortLastLogin === 'last_login_asc' ? 'ascending' : 'none'}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        onClick={cycleLastLoginSort}
+                                                        title={sortLastLogin === '' ? 'Sort by last login, newest first' : sortLastLogin === 'last_login_desc' ? 'Sort by last login, oldest first' : 'Clear last login sort'}
+                                                        className={`inline-flex items-center gap-1.5 uppercase tracking-wider font-semibold rounded-md -mx-1 px-1 py-0.5 hover:text-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer ${sortLastLogin ? 'text-indigo-600' : ''}`}
+                                                    >
+                                                        Last Login
+                                                        {sortLastLogin === 'last_login_desc' ? (
+                                                            <ArrowDown size={14} aria-hidden="true" />
+                                                        ) : sortLastLogin === 'last_login_asc' ? (
+                                                            <ArrowUp size={14} aria-hidden="true" />
+                                                        ) : (
+                                                            <ArrowUpDown size={14} aria-hidden="true" className="opacity-60" />
+                                                        )}
+                                                    </button>
+                                                </th>
                                                 <th className="py-3.5 px-4 text-right">Actions</th>
                                             </tr>
                                         </thead>

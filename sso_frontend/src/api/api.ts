@@ -73,23 +73,32 @@ export const impersonateUser = async (token: string, email: string) => {
 
 // ─── EORDERWEB User Management APIs ───────────────────────────────────────────
 
-export const fetchEOrderUsers = async (token: string, q?: string) => {
+export type EOrderUserSort = '' | 'last_login_desc' | 'last_login_asc';
+
+export const fetchEOrderUsers = async (token: string, q?: string, sort?: EOrderUserSort) => {
     const response = await api.get('/eorder-users/', {
-        params: { q },
+        params: { q, sort: sort || undefined },
         headers: { Authorization: `Bearer ${token}` }
     });
     return response.data;
 };
 
-export const exportEOrderUsersExcel = async (token: string, q?: string) => {
+export const exportEOrderUsersExcel = async (token: string, q?: string, sort?: EOrderUserSort) => {
     const response = await api.get('/eorder-users/export-excel/', {
-        params: { q },
+        params: { q, sort: sort || undefined },
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
     });
     return response.data;
 };
 
+export const fetchEOrderUserStats = async (token: string, periode: string) => {
+    const response = await api.get('/eorder-users/stats/', {
+        params: { periode },
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
 
 export const importEOrderUsersCsv = async (token: string, fileOrContent: File | string) => {
     if (typeof fileOrContent === 'string') {

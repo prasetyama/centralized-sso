@@ -1,6 +1,8 @@
 import os
 import csv
+import json
 import bcrypt
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -8,7 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q
 
 from sso_core.models import LocalUser, ModuleMatrix, UserModuleRole, StdAreaMatrix, EorderDistributor, Module
@@ -17,6 +19,73 @@ from sso_core.views import BaseAuthenticatedView, get_last_login_map
 # Setup Log Directory
 LOG_DIR = Path(settings.BASE_DIR) / 'logs'
 LOG_DIR.mkdir(exist_ok=True)
+
+LAST_LOGIN_SORTS = ('last_login_desc', 'last_login_asc')
+
+# Mirrors the approval_status mapping used by eorder-api (orderDetail.repository.ts)
+RELEASE_FLAG_LABELS = {
+    '1': 'WAITING APPROVAL NSM',
+    '2': 'APPROVED NSM',
+    '3': 'REJECTED NSM',
+    '4': 'APPROVED',
+    '5': 'REJECTED',
+    '99': 'TRANSFER TO SAP',
+}
+
+
+def _user_identifiers(users):
+    identifiers = []
+    for u in users:
+        if u.email:
+            identifiers.append(u.email)
+        if u.username:
+            identifiers.append(u.username)
+    return identifiers
+
+
+def _resolve_last_login(user, last_login_map):
+    if user.email and user.email.lower() in last_login_map:
+        return last_login_map[user.email.lower()]
+    if user.username and user.username.lower() in last_login_map:
+        return last_login_map[user.username.lower()]
+    return None
+
+
+def _login_timestamp(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace('Z', '+00:00')).timestamp()
+    except ValueError:
+        return None
+
+
+def _load_users_with_last_login(users_qs, sort, limit=None):
+    """
+    Returns (users_list, last_login_map). When sorting by last login, all matching users are
+    ranked before the limit is applied; users that never logged in always go last.
+    """
+    if sort not in LAST_LOGIN_SORTS:
+        qs = users_qs.order_by('-id')
+        users_list = list(qs[:limit] if limit else qs)
+        return users_list, get_last_login_map(_user_identifiers(users_list))
+
+    all_users = list(users_qs.order_by('-id'))
+    last_login_map = get_last_login_map(_user_identifiers(all_users))
+
+    with_login, without_login = [], []
+    for u in all_users:
+        ts = _login_timestamp(_resolve_last_login(u, last_login_map))
+        if ts is None:
+            without_login.append(u)
+        else:
+            with_login.append((ts, u))
+    with_login.sort(key=lambda item: item[0], reverse=(sort == 'last_login_desc'))
+
+    users_list = [u for _, u in with_login] + without_login
+    if limit:
+        users_list = users_list[:limit]
+    return users_list, last_login_map
 
 
 class AdminOnlyAPIView(BaseAuthenticatedView):
@@ -63,17 +132,8 @@ class EOrderUserListView(AdminOnlyAPIView):
         if request.query_params.get('all_roles') != 'true':
             users_qs = users_qs.filter(role='user_eorder')
 
-        users_list = list(users_qs.order_by('-id')[:200])
-
-        # Batch fetch last_login timestamps for all users in the list
-        all_identifiers = []
-        for u in users_list:
-            if u.email:
-                all_identifiers.append(u.email)
-            if u.username:
-                all_identifiers.append(u.username)
-        
-        last_login_map = get_last_login_map(all_identifiers)
+        sort = request.query_params.get('sort', '').strip()
+        users_list, last_login_map = _load_users_with_last_login(users_qs, sort, limit=200)
 
         result_list = []
         for u in users_list:
@@ -100,11 +160,7 @@ class EOrderUserListView(AdminOnlyAPIView):
                     "dist_name": dist_obj.dist_name if dist_obj else None
                 })
 
-            user_last_login = None
-            if u.email and u.email.lower() in last_login_map:
-                user_last_login = last_login_map[u.email.lower()]
-            elif u.username and u.username.lower() in last_login_map:
-                user_last_login = last_login_map[u.username.lower()]
+            user_last_login = _resolve_last_login(u, last_login_map)
 
             result_list.append({
                 "id": u.id,
@@ -578,17 +634,8 @@ class EOrderUserExportView(AdminOnlyAPIView):
         if request.query_params.get('all_roles') != 'true':
             users_qs = users_qs.filter(role='user_eorder')
 
-        users_list = list(users_qs.order_by('-id'))
-
-        # Batch fetch last_login timestamps
-        all_identifiers = []
-        for u in users_list:
-            if u.email:
-                all_identifiers.append(u.email)
-            if u.username:
-                all_identifiers.append(u.username)
-
-        last_login_map = get_last_login_map(all_identifiers)
+        sort = request.query_params.get('sort', '').strip()
+        users_list, last_login_map = _load_users_with_last_login(users_qs, sort)
 
         import openpyxl
         from openpyxl.utils import get_column_letter
@@ -651,11 +698,7 @@ class EOrderUserExportView(AdminOnlyAPIView):
                 dist_details.append(detail_str)
 
             user_last_login = "-"
-            raw_last_login = None
-            if u.email and u.email.lower() in last_login_map:
-                raw_last_login = last_login_map[u.email.lower()]
-            elif u.username and u.username.lower() in last_login_map:
-                raw_last_login = last_login_map[u.username.lower()]
+            raw_last_login = _resolve_last_login(u, last_login_map)
 
             if raw_last_login:
                 try:
@@ -696,4 +739,185 @@ class EOrderUserExportView(AdminOnlyAPIView):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         wb.save(response)
         return response
+
+
+class EOrderUserStatsView(AdminOnlyAPIView):
+    """
+    GET: Dashboard statistics for EORDERWEB users.
+      - total_users: users with role 'user_eorder'
+      - total_shipto: distinct ShipToRD in std_area_matrix mapped to those users
+      - submitted_shipto: mapped Ship-To whose distributor has a non-cancelled order in eorder_eorderdatadtl
+    Query param `periode`: YYYYMM (default: current month) or 'all'.
+
+    eorder_eorderdatadtl only stores distid (INT), so submission status is tracked per DistID:
+    every Ship-To under the same DistID shares the same status.
+    """
+    def get(self, request):
+        try:
+            self.check_admin(request)
+        except PermissionError as e:
+            return Response({"error": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        periode = (request.query_params.get('periode') or datetime.now().strftime('%Y%m')).strip().replace('-', '')
+        if periode != 'all' and not (len(periode) == 6 and periode.isdigit()):
+            return Response({"error": "Invalid periode. Use YYYYMM or 'all'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        total_users = LocalUser.objects.filter(role='user_eorder').count()
+
+        # 1. Query distinct mapped Ship-To, attached users, and distributor details via SQL
+        shipto_sql = """
+            WITH user_mapping AS (
+                SELECT 
+                    TRIM(sam.ShipToRD) AS shiptord,
+                    u.id AS user_id,
+                    MAX(sam.Zone) AS zone,
+                    MAX(sam.RD_DESC) AS rd_desc,
+                    MAX(u.username) AS username,
+                    MAX(u.email) AS email
+                FROM std_area_matrix sam
+                JOIN users u ON (
+                    (u.email IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(sam.Email)))
+                    OR (u.username IS NOT NULL AND LOWER(TRIM(u.username)) = LOWER(TRIM(sam.Email)))
+                )
+                WHERE u.role = 'user_eorder'
+                  AND sam.ShipToRD IS NOT NULL AND TRIM(sam.ShipToRD) <> ''
+                GROUP BY TRIM(sam.ShipToRD), u.id
+            ),
+            shipto_users AS (
+                SELECT 
+                    shiptord,
+                    MAX(zone) AS zone,
+                    MAX(rd_desc) AS rd_desc,
+                    JSON_ARRAYAGG(
+                        JSON_OBJECT(
+                            'id', user_id,
+                            'username', username,
+                            'email', email
+                        )
+                    ) AS users_json
+                FROM user_mapping
+                GROUP BY shiptord
+            ),
+            dist_ranked AS (
+                SELECT 
+                    su.shiptord,
+                    d.DistID AS dist_id,
+                    d.DistName AS dist_name,
+                    d.Alamat3 AS city,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY su.shiptord 
+                        ORDER BY 
+                            CASE 
+                                WHEN d.Ship_To = su.shiptord THEN 1
+                                WHEN d.DistID = su.shiptord THEN 2
+                                ELSE 3
+                            END,
+                            CASE WHEN d.DistID IS NOT NULL AND d.DistID <> '' THEN 0 ELSE 1 END,
+                            d.id ASC
+                    ) AS rn
+                FROM shipto_users su
+                JOIN eorder_eorder_distributor d ON (
+                    d.Ship_To = su.shiptord
+                    OR d.DistID = su.shiptord
+                    OR (su.shiptord REGEXP '^[0-9]+$' AND d.DistID = LPAD(su.shiptord, 6, '0'))
+                )
+            )
+            SELECT 
+                su.shiptord,
+                su.zone,
+                su.rd_desc,
+                dr.dist_id,
+                dr.dist_name,
+                dr.city,
+                su.users_json
+            FROM shipto_users su
+            LEFT JOIN dist_ranked dr ON dr.shiptord = su.shiptord AND dr.rn = 1
+        """
+
+        # 2. Submitted orders grouped per distributor + file (one file = one PO)
+        order_sql = """
+            SELECT distid, filename,
+                   MAX(ponumber), MAX(periode), MAX(order_type), MAX(principal),
+                   SUM(COALESCE(orderqty, 0)), COUNT(*), MAX(CREATEDATE), MAX(release_flag)
+            FROM eorder_eorderdatadtl
+            WHERE distid IS NOT NULL
+              AND (cancel_flag IS NULL OR cancel_flag <> '1')
+        """
+        order_params = []
+        if periode != 'all':
+            order_sql += " AND REPLACE(periode, '-', '') = %s"
+            order_params.append(periode)
+        order_sql += " GROUP BY distid, filename"
+
+        periode_sql = """
+            SELECT DISTINCT REPLACE(periode, '-', '') AS p
+            FROM eorder_eorderdatadtl
+            WHERE periode IS NOT NULL AND periode <> ''
+              AND (cancel_flag IS NULL OR cancel_flag <> '1')
+            ORDER BY p DESC
+            LIMIT 36
+        """
+
+        orders_by_dist = defaultdict(list)
+        with connection.cursor() as cursor:
+            cursor.execute(shipto_sql)
+            shipto_rows = cursor.fetchall()
+
+            cursor.execute(order_sql, order_params)
+            for (distid, filename, ponumber, row_periode, order_type, principal,
+                 total_qty, line_count, created, release_flag) in cursor.fetchall():
+                flag = str(release_flag).strip() if release_flag is not None else None
+                orders_by_dist[int(distid)].append({
+                    "filename": filename,
+                    "po_number": ponumber,
+                    "periode": row_periode,
+                    "order_type": order_type,
+                    "principal": principal,
+                    "total_qty": int(total_qty or 0),
+                    "line_count": int(line_count or 0),
+                    "submitted_at": created.isoformat() if created else None,
+                    "release_flag": flag,
+                    "approval_status": RELEASE_FLAG_LABELS.get(flag) if flag else None,
+                })
+
+            cursor.execute(periode_sql)
+            available_periodes = [row[0] for row in cursor.fetchall() if row[0]]
+
+        # 3. Merge into per Ship-To detail rows
+        shiptos = []
+        for code, zone, rd_desc, dist_id, dist_name, city, users_raw in shipto_rows:
+            users_parsed = json.loads(users_raw) if isinstance(users_raw, str) else (users_raw or [])
+            dist_id_str = (dist_id or '').strip()
+            orders = orders_by_dist.get(int(dist_id_str), []) if dist_id_str.isdigit() else []
+            orders = sorted(orders, key=lambda o: o["submitted_at"] or '', reverse=True)
+
+            shiptos.append({
+                "shiptord": code,
+                "zone": zone,
+                "rd_desc": rd_desc,
+                "users": users_parsed,
+                "dist_id": dist_id_str or None,
+                "dist_name": dist_name,
+                "city": city,
+                "submitted": bool(orders),
+                "po_count": len(orders),
+                "total_qty": sum(o["total_qty"] for o in orders),
+                "last_submitted_at": orders[0]["submitted_at"] if orders else None,
+                "orders": orders,
+            })
+
+        shiptos.sort(key=lambda s: (s["dist_name"] or s["rd_desc"] or s["shiptord"]).upper())
+        submitted_count = sum(1 for s in shiptos if s["submitted"])
+
+        return Response({
+            "periode": periode,
+            "available_periodes": available_periodes,
+            "total_users": total_users,
+            "total_shipto": len(shiptos),
+            "submitted_shipto": submitted_count,
+            "not_submitted_shipto": len(shiptos) - submitted_count,
+            "shiptos": shiptos,
+        }, status=status.HTTP_200_OK)
 
