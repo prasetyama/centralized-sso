@@ -164,6 +164,7 @@ const LoginPage = () => {
 };
 
 import { EOrderUserManagement } from './pages/EOrderUserManagement';
+import { StdAreaMatrixManagement } from './pages/StdAreaMatrixManagement';
 import { ChangePasswordPage } from './pages/ChangePassword';
 
 function App() {
@@ -189,6 +190,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <EOrderUserManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/std-area-matrix"
+              element={
+                <ProtectedRoute>
+                  <StdAreaMatrixManagement />
                 </ProtectedRoute>
               }
             />

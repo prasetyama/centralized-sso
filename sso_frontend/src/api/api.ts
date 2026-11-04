@@ -71,7 +71,7 @@ export const impersonateUser = async (token: string, email: string) => {
     }
 }
 
-// ─── EORDERWEB User Management APIs ───────────────────────────────────────────
+// EORDERWEB User Management APIs
 
 export type EOrderUserSort = '' | 'last_login_desc' | 'last_login_asc';
 
@@ -165,6 +165,107 @@ export const fetchEOrderImportLogDetail = async (token: string, filename: string
 export const changePassword = async (token: string, data: { old_password: string; new_password: string; confirm_password: string }) => {
     const response = await api.post('/user/change-password/', data, {
         headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+// STD Area Matrix (RSM & ASM Distributor Mapping) APIs
+
+export interface StdAreaMatrixFilterParams {
+    q?: string;
+    zone?: string;
+    operator?: string;
+    mapping_type?: string;
+}
+
+export interface StdAreaMatrixEntryPayload {
+    zone: string;
+    shiptord: string;
+    rd_desc?: string;
+    operator: 'EQ' | 'EX';
+}
+
+export const fetchStdAreaMatrix = async (token: string, params: StdAreaMatrixFilterParams = {}) => {
+    const response = await api.get('/std-area-matrix/', {
+        params: {
+            q: params.q || undefined,
+            zone: params.zone || undefined,
+            operator: params.operator || undefined,
+            mapping_type: params.mapping_type || 'rsm_asm'
+        },
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const fetchStdAreaMatrixOptions = async (token: string) => {
+    const response = await api.get('/std-area-matrix/options/', {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const saveStdAreaMatrixUserMapping = async (
+    token: string,
+    data: {
+        email: string;
+        old_email?: string;
+        entries: StdAreaMatrixEntryPayload[];
+        replace?: boolean;
+    }
+) => {
+    const response = await api.post('/std-area-matrix/user-mapping/', data, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const deleteStdAreaMatrixUserMapping = async (token: string, email: string) => {
+    const response = await api.delete('/std-area-matrix/user-mapping/', {
+        params: { email },
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const createStdAreaMatrixRow = async (
+    token: string,
+    data: { email: string; zone: string; shiptord: string; rd_desc?: string; operator: 'EQ' | 'EX' }
+) => {
+    const response = await api.post('/std-area-matrix/rows/', data, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const updateStdAreaMatrixRow = async (
+    token: string,
+    rowId: number,
+    data: { email: string; zone: string; shiptord: string; rd_desc?: string; operator: 'EQ' | 'EX' }
+) => {
+    const response = await api.put(`/std-area-matrix/rows/${rowId}/`, data, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const deleteStdAreaMatrixRow = async (token: string, rowId: number) => {
+    const response = await api.delete(`/std-area-matrix/rows/${rowId}/`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const exportStdAreaMatrixExcel = async (token: string, params: StdAreaMatrixFilterParams = {}) => {
+    const response = await api.get('/std-area-matrix/export-excel/', {
+        params: {
+            q: params.q || undefined,
+            zone: params.zone || undefined,
+            operator: params.operator || undefined,
+            mapping_type: params.mapping_type || 'rsm_asm'
+        },
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
     });
     return response.data;
 };

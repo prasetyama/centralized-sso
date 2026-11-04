@@ -9,6 +9,13 @@ from sso_core.eorder_user_views import (
     EOrderUserExportView,
     EOrderUserStatsView
 )
+from sso_core.std_area_matrix_views import (
+    StdAreaMatrixListView,
+    StdAreaMatrixOptionsView,
+    StdAreaMatrixUserMappingView,
+    StdAreaMatrixRowView,
+    StdAreaMatrixExportView
+)
 
 urlpatterns = [
     path('auth/google/', GoogleLoginView.as_view(), name='google-login'),
@@ -31,5 +38,13 @@ urlpatterns = [
     path('eorder-users/distributors/', EOrderUserDistributorsView.as_view(), name='eorder-user-distributors'),
     path('eorder-users/logs/', EOrderImportLogsView.as_view(), name='eorder-import-logs'),
     path('eorder-users/logs/<str:filename>/', EOrderImportLogsView.as_view(), name='eorder-import-log-detail'),
+
+    # STD Area Matrix Management Routes (RSM & ASM Distributor Mapping)
+    path('std-area-matrix/', StdAreaMatrixListView.as_view(), name='std-area-matrix-list'),
+    path('std-area-matrix/options/', StdAreaMatrixOptionsView.as_view(), name='std-area-matrix-options'),
+    path('std-area-matrix/user-mapping/', StdAreaMatrixUserMappingView.as_view(), name='std-area-matrix-user-mapping'),
+    path('std-area-matrix/rows/', StdAreaMatrixRowView.as_view(), name='std-area-matrix-row-create'),
+    path('std-area-matrix/rows/<int:row_id>/', StdAreaMatrixRowView.as_view(), name='std-area-matrix-row-detail'),
+    path('std-area-matrix/export-excel/', StdAreaMatrixExportView.as_view(), name='std-area-matrix-export-excel'),
 ]
 

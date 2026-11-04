@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutGrid, ExternalLink, LogOut, ChevronDown,
   Shield, X, Loader2, AlertCircle, CheckCircle2,
-  User, Users, KeyRound
+  User, Users, KeyRound, MapPin
 } from 'lucide-react';
 import { impersonateUser } from '../api/api';
 
@@ -180,11 +180,11 @@ const UserDropdown = ({ onImpersonate }: { onImpersonate: () => void }) => {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-1.5 z-40 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-gray-100 py-1.5 z-40 overflow-hidden">
           {/* User info header */}
           <div className="px-4 py-3 border-b border-gray-100">
             <p className="text-xs font-semibold text-gray-800 truncate">{user?.name}</p>
-            <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             {isAdmin && (
               <span className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700">
                 ADMIN
@@ -192,7 +192,6 @@ const UserDropdown = ({ onImpersonate }: { onImpersonate: () => void }) => {
             )}
           </div>
 
-          {/* E-Order User Mgmt & Backdoor login — ADMIN only */}
           {isAdmin && (
             <>
               <button
@@ -200,15 +199,23 @@ const UserDropdown = ({ onImpersonate }: { onImpersonate: () => void }) => {
                 onClick={() => { setOpen(false); navigate('/eorder-users'); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-indigo-700 hover:bg-indigo-50 transition-colors font-medium cursor-pointer"
               >
-                <Users size={15} className="text-indigo-500" />
+                <Users size={15} className="text-indigo-500 shrink-0" />
                 E-Order User Mgmt
+              </button>
+              <button
+                id="std-area-matrix-mgmt-btn"
+                onClick={() => { setOpen(false); navigate('/std-area-matrix'); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-indigo-700 hover:bg-indigo-50 transition-colors font-medium cursor-pointer"
+              >
+                <MapPin size={15} className="text-indigo-500 shrink-0" />
+                STD Area Matrix (RSM/ASM)
               </button>
               <button
                 id="backdoor-login-btn"
                 onClick={() => { setOpen(false); onImpersonate(); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-violet-700 hover:bg-violet-50 transition-colors font-medium cursor-pointer"
               >
-                <Shield size={15} className="text-violet-500" />
+                <Shield size={15} className="text-violet-500 shrink-0" />
                 Backdoor Login
               </button>
             </>
@@ -285,7 +292,7 @@ export const SSOHomepageGrid = () => {
         <div className="bg-violet-600 text-white text-xs px-4 py-2 flex items-center justify-center gap-2">
           <Shield size={13} />
           <span>
-            Impersonating <strong>{impersonating}</strong> — session is temporary
+            Impersonating <strong>{impersonating}</strong>, session is temporary
           </span>
           <button
             onClick={logout}
